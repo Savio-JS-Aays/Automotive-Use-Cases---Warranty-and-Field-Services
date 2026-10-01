@@ -6,10 +6,9 @@ import { supabase } from '../config/supabaseClient';
 
 const NAV_ITEMS = [
   { label: 'Overview', path: '/overview' },
-  { label: 'Early Warning System', path: '/ews' },
-  { label: 'Predictive Calibration', path: '/predictive-calibration' },
-  { label: 'Dealer Intelligence', path: '/dealer-intelligence' },
-  { label: 'Supplier Subrogation', path: '/supplier-subrogation' },
+  { label: 'Claims & Repair', path: '/claims-analytics' },
+  { label: 'Reliability & Early Warning', path: '/reliability' },
+  { label: 'Dealer & Supplier Accountability', path: '/accountability' },
 ];
 
 function FilterSelect({ label, value, onChange, options }) {
@@ -101,7 +100,7 @@ function SidebarFilters() {
     fetchFilterOptions();
   }, []);
 
-  const showExtendedFilters = path === '/overview' || path === '/ews' || path === '/';
+  const showExtendedFilters = path === '/overview' || path === '/reliability' || path === '/claims-analytics' || path === '/accountability' || path === '/';
 
   return (
     <aside className="w-64 h-full bg-white border-r border-slate-200 flex flex-col flex-shrink-0 overflow-y-auto">
@@ -114,7 +113,7 @@ function SidebarFilters() {
         <FilterSelect label="Region" value={filters.region} onChange={filters.setRegion} options={options.regions} />
         <FilterSelect label="Model" value={filters.model} onChange={filters.setModel} options={options.models} />
         
-        {/* Extended Filters: Only visible on Overview and EWS */}
+        {/* Extended Filters: Only visible on Overview, EWS and Claims & Repair */}
         {showExtendedFilters && (
           <>
             <FilterSelect label="Variant" value={filters.variant} onChange={filters.setVariant} options={options.variants} />

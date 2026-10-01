@@ -2,10 +2,9 @@ import React from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import DashboardLayout from './layouts/DashboardLayout'
 import WarrantyOverview from './modules/warranty-overview/WarrantyOverview'
-import EarlyWarningSystem from './modules/early-warning-system/EarlyWarningSystem' 
-import PredictiveCalibration from './modules/predictive-calibration/PredictiveCalibration.jsx' 
-import DealerIntelligence from './modules/dealer-intelligence/DealerIntelligence'
-import SupplierSubrogation from './modules/supplier-subrogation/SupplierSubrogation'
+import ClaimsAnalytics from './modules/claims-analytics/ClaimsAnalytics'
+import Reliability from './modules/reliability/Reliability'
+import Accountability from './modules/accountability/Accountability'
 
 
 function App() {
@@ -18,15 +17,16 @@ function App() {
           
           {/* Module Routes */}
           <Route path="/overview" element={<WarrantyOverview />} />
-          <Route path="/ews" element={<EarlyWarningSystem />} />
-          <Route path="/predictive-calibration" element={<PredictiveCalibration />} />
+          <Route path="/claims-analytics" element={<ClaimsAnalytics />} />
+          <Route path="/reliability" element={<Reliability />} />
+          {/* EWS and Predictive Calibration were merged into Reliability & Early Warning */}
+          <Route path="/ews" element={<Navigate to={`/reliability?rel=${encodeURIComponent('{"tab":"signals"}')}`} replace />} />
+          <Route path="/predictive-calibration" element={<Navigate to={`/reliability?rel=${encodeURIComponent('{"tab":"reliability"}')}`} replace />} />
           
-          <Route 
-            path="/dealer-intelligence" 
-            element={<DealerIntelligence />} />
-          <Route 
-            path="/supplier-subrogation" 
-            element={<SupplierSubrogation />} />
+          <Route path="/accountability" element={<Accountability />} />
+          {/* Dealer Intelligence and Supplier Subrogation were merged into Dealer & Supplier Accountability */}
+          <Route path="/dealer-intelligence" element={<Navigate to={`/accountability?acc=${encodeURIComponent('{"tab":"dealers"}')}`} replace />} />
+          <Route path="/supplier-subrogation" element={<Navigate to={`/accountability?acc=${encodeURIComponent('{"tab":"recovery"}')}`} replace />} />
         </Routes>
       </DashboardLayout>
     </BrowserRouter>
