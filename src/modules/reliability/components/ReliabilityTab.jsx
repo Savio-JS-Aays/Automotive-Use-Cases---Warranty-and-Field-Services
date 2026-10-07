@@ -45,7 +45,7 @@ export default function ReliabilityTab({ filters, local, lookups, partId: chosen
 
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
         <label className="flex items-center gap-2">
           <span className="text-slate-500 font-medium">Part</span>
           <select value={partId || ''} onChange={(e) => actions.focusPart(e.target.value, lookups?.partById?.[e.target.value]?.part_name)}
@@ -170,7 +170,7 @@ function PartKpis({ fit, calRow, basis, fmt, loading }) {
       sub: basis === 'km' ? 'within 300,000 km' : 'within 36 months', info: 'Share of units expected to fail before the base warranty limit, F(limit).' },
   ];
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
       {cards.map((k) => <KpiCard key={k.label} {...k} />)}
     </div>
   );

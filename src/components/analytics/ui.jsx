@@ -4,25 +4,42 @@ import { HelpCircle, Loader2, AlertTriangle, ArrowUpRight, ArrowDownRight, Minus
 // ---------------------------------------------------------------------------
 // Layout primitives
 // ---------------------------------------------------------------------------
-export function InfoTooltip({ text }) {
+export function InfoTooltip({ text, align = 'center', className = 'ml-1.5' }) {
   if (!text) return null;
+  const pos = align === 'right' ? 'right-0' : 'left-1/2 -translate-x-1/2';
   return (
-    <span className="group relative inline-flex items-center ml-1.5 align-middle">
-      <HelpCircle className="w-3.5 h-3.5 text-slate-300 hover:text-sky-500 cursor-help" />
-      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-64 bg-slate-800 text-slate-50 text-xs font-normal normal-case tracking-normal rounded-lg p-3 z-30 shadow-xl leading-relaxed">
+    <span className={`group relative inline-flex items-center align-middle ${className}`}>
+      <HelpCircle className="w-4 h-4 text-slate-400 hover:text-blue-600 cursor-help" strokeWidth={1.75} />
+      <span className={`absolute bottom-full ${pos} mb-2 hidden group-hover:block w-64 bg-slate-800 text-slate-50 text-xs font-normal normal-case tracking-normal text-left rounded-lg p-3 z-30 shadow-xl leading-relaxed`}>
         {text}
       </span>
     </span>
   );
 }
 
+// Page title banner: title, optional "Page N" badge, description, optional right-hand meta
+export function PageHeader({ title, page, description, children }) {
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 px-7 py-5 flex flex-col md:flex-row md:items-center justify-between gap-3">
+      <div>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">{title}</h1>
+          {page && <span className="bg-blue-100 text-blue-700 text-sm font-semibold px-2.5 py-0.5 rounded-full">Page {page}</span>}
+        </div>
+        {description && <p className="text-slate-600 text-sm mt-1.5">{description}</p>}
+      </div>
+      {children && <div className="text-xs text-slate-500 md:text-right space-y-1">{children}</div>}
+    </div>
+  );
+}
+
 export function Card({ title, subtitle, info, actions, tag, children, className = '' }) {
   return (
-    <div className={`bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col ${className}`}>
+    <div className={`bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col ${className}`}>
       {(title || actions) && (
-        <div className="flex items-start justify-between gap-3 mb-4">
+        <div className="flex items-start justify-between gap-3 mb-5">
           <div>
-            <h3 className="text-sm font-bold text-slate-900 flex items-center">
+            <h3 className="text-base font-bold text-slate-900 flex items-center">
               {title}
               <InfoTooltip text={info} />
               {tag && (
@@ -31,7 +48,7 @@ export function Card({ title, subtitle, info, actions, tag, children, className 
                 </span>
               )}
             </h3>
-            {subtitle && <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>}
+            {subtitle && <p className="text-sm text-slate-500 mt-1">{subtitle}</p>}
           </div>
           {actions && <div className="flex items-center gap-2 flex-shrink-0">{actions}</div>}
         </div>
@@ -43,14 +60,14 @@ export function Card({ title, subtitle, info, actions, tag, children, className 
 
 export function Segmented({ value, onChange, options, size = 'sm' }) {
   return (
-    <div className="inline-flex bg-slate-100 rounded-md p-0.5">
+    <div className="inline-flex flex-wrap gap-1">
       {options.map((o) => (
         <button
           key={o.value}
           type="button"
           onClick={() => onChange(o.value)}
-          className={`${size === 'xs' ? 'px-2 py-0.5 text-[11px]' : 'px-2.5 py-1 text-xs'} font-medium rounded transition-colors ${
-            value === o.value ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+          className={`${size === 'xs' ? 'px-2 py-0.5 text-[11px]' : 'px-3 py-1 text-[13px]'} font-medium rounded-md transition-colors ${
+            value === o.value ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900'
           }`}
         >
           {o.label}
@@ -86,8 +103,19 @@ export function DataState({ state, height = 'h-72', empty = 'No claims match the
 // ---------------------------------------------------------------------------
 // KPI card with delta vs previous period
 // ---------------------------------------------------------------------------
+// Top-border accent colours, matching the suite's KPI card style
+const KPI_ACCENTS = {
+  blue: 'border-t-blue-600',
+  emerald: 'border-t-emerald-500',
+  violet: 'border-t-violet-600',
+  amber: 'border-t-amber-500',
+  rose: 'border-t-rose-500',
+  sky: 'border-t-sky-500',
+};
+
 // betterWhen: 'up' | 'down' | null (neutral). deltaMode: 'pct' (relative) | 'pp' (percentage points) | 'abs'
-export function KpiCard({ label, value, current, previous, betterWhen = null, deltaMode = 'pct', sub, info, onClick }) {
+// accent: a KPI_ACCENTS key; defaults to emerald (higher is better), amber (lower is better) or blue (neutral)
+export function KpiCard({ label, value, current, previous, betterWhen = null, deltaMode = 'pct', sub, info, onClick, accent }) {
   let delta = null;
   if (current !== null && current !== undefined && previous !== null && previous !== undefined) {
     const c = Number(current);
@@ -102,27 +130,28 @@ export function KpiCard({ label, value, current, previous, betterWhen = null, de
     Icon = delta.v > 0 ? ArrowUpRight : ArrowDownRight;
     if (betterWhen) tone = (delta.v > 0) === (betterWhen === 'up') ? 'text-emerald-600' : 'text-rose-600';
   }
+  const accentClass = KPI_ACCENTS[accent || (betterWhen === 'up' ? 'emerald' : betterWhen === 'down' ? 'amber' : 'blue')];
   return (
     <button
       type="button"
       onClick={onClick}
-      className="text-left bg-white rounded-xl shadow-sm border border-slate-200 p-4 hover:shadow-md hover:border-slate-300 transition-all disabled:cursor-default"
+      className={`text-left bg-white rounded-2xl shadow-sm border border-slate-200 border-t-[3px] ${accentClass} px-5 pt-5 pb-4 min-h-[124px] flex flex-col hover:shadow-md transition-shadow disabled:cursor-default`}
       disabled={!onClick}
     >
-      <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider flex items-center">
-        {label}
-        <InfoTooltip text={info} />
-      </p>
-      <p className="text-2xl font-bold text-slate-900 mt-2 tabular-nums">{value}</p>
-      <div className="flex items-center justify-between mt-1 gap-2">
-        <span className="text-[11px] text-slate-400 truncate">{sub}</span>
+      <span className="w-full flex items-start justify-between gap-2">
+        <span className="text-sm font-semibold text-slate-800 leading-snug">{label}</span>
+        <InfoTooltip text={info} align="right" className="flex-shrink-0 mt-px" />
+      </span>
+      <span className="block text-[28px] leading-tight font-bold text-slate-900 mt-3 tabular-nums tracking-tight">{value}</span>
+      <span className="w-full flex items-center justify-between mt-auto pt-1 gap-2">
+        <span className="text-xs text-slate-500 truncate">{sub}</span>
         {delta && (
-          <span className={`text-[11px] font-semibold flex items-center ${tone}`} title="vs previous equal-length period">
-            <Icon className="w-3 h-3" />
+          <span className={`text-xs font-semibold flex items-center flex-shrink-0 ${tone}`} title="vs previous equal-length period">
+            <Icon className="w-3.5 h-3.5" />
             {delta.text}
           </span>
         )}
-      </div>
+      </span>
     </button>
   );
 }

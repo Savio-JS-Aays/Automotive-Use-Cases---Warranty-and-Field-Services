@@ -36,7 +36,7 @@ export default function FilterBar({ local, actions, subsystems }) {
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 px-4 py-3">
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 px-4 py-3">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <div className="flex items-center gap-2 text-xs">
           <span className="text-slate-500 font-medium">Date basis</span>

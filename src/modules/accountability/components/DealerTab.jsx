@@ -30,7 +30,7 @@ export default function DealerTab({ scoreFilters, local, lookups, actions, perio
 
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 px-4 py-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 px-4 py-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs">
         <span className="text-slate-500">Scorecard period: <b className="text-slate-700">{periodLabel}</b></span>
         <span className="flex items-center gap-2"><span className="text-slate-500 font-medium">Peer group</span>
           <Segmented value={local.peer} onChange={local.setPeer} options={[{ value: 'network', label: 'Network' }, { value: 'tier', label: 'Same tier' }, { value: 'region', label: 'Same region' }]} />

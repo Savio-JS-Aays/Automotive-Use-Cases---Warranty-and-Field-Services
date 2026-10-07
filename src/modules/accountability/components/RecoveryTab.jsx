@@ -20,7 +20,7 @@ export default function RecoveryTab({ filters, fkey, local, actions }) {
   const d = sum.data;
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <KpiCard label="Recovery rate" value={d ? formatPct(Number(d.waterfall.agreed_inr) / Math.max(1, Number(d.waterfall.paid_inr))) : '…'}
           sub="agreed ÷ supplier-liable paid" info="Recovered ÷ supplier-liable paid cost (C&R K15)." />
         <KpiCard label="Agreed recovery" value={d ? formatINR(d.waterfall.agreed_inr) : '…'} sub={d ? `NFF ${formatINR(d.waterfall.nff_agreed_inr)}` : ''}

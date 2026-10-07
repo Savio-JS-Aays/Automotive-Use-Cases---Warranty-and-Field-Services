@@ -5,7 +5,7 @@ import { useFilterStore } from '../../store/useFilterStore';
 import { useReliabilityStore, readStateFromUrl, writeStateToUrl, claimsAnalyticsHref, CHIP_LABELS } from './store';
 import { buildFilters, fetchLookups, fetchWeibull, BackendMissingError } from './api';
 import { useAsync } from '../../lib/analytics';
-import { Segmented } from '../../components/analytics/ui';
+import { PageHeader, Segmented } from '../../components/analytics/ui';
 import { ClaimDrawer } from '../claims-analytics/components/Drawers';
 import SignalsTab from './components/SignalsTab';
 import ReliabilityTab from './components/ReliabilityTab';
@@ -65,7 +65,7 @@ export default function Reliability() {
         {TABS.map((t) => (
           <button key={t.key} type="button" onClick={() => local.setTab(t.key)}
             className={`px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 -mb-px transition-colors ${
-              tab === t.key ? 'border-sky-600 text-sky-700' : 'border-transparent text-slate-500 hover:text-slate-800'
+              tab === t.key ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}>
             {t.label}
           </button>
@@ -115,16 +115,11 @@ function BackendMissing() {
 
 function Header({ chips }) {
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col md:flex-row md:items-center justify-between gap-2">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Reliability &amp; Early Warning</h1>
-        <p className="text-slate-500 text-sm mt-0.5">Detect emerging failures, check part durability against design, and forecast warranty exposure.</p>
-      </div>
-      <div className="text-xs text-slate-500 md:text-right space-y-1">
-        <p>Amounts in ₹ (INR) · distance in km · data as of 2026-09-24</p>
-        <Link to={claimsAnalyticsHref(chips)} className="inline-block font-semibold text-sky-700 hover:underline">Open in Claims &amp; Repair ↗</Link>
-      </div>
-    </div>
+    <PageHeader title="Reliability & Early Warning" page={3}
+      description="Detect emerging failures, check part durability against design, and forecast warranty exposure.">
+      <p>Amounts in ₹ (INR) · distance in km · data as of 2026-09-24</p>
+      <Link to={claimsAnalyticsHref(chips)} className="inline-block font-semibold text-blue-700 hover:underline">Open in Claims &amp; Repair ↗</Link>
+    </PageHeader>
   );
 }
 
@@ -144,7 +139,7 @@ function FilterBar({ local, lookups }) {
     { key: 'cluster_id', label: 'Failure cluster', options: Object.values(lookups?.clusterById || {}).map((c) => ({ value: c.cluster_id, label: c.cluster_id })) },
   ];
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 px-4 py-3">
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 px-4 py-3">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <div className="flex items-center gap-2 text-xs">
           <span className="text-slate-500 font-medium">Region basis</span>

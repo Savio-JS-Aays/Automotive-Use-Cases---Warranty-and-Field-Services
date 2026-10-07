@@ -37,7 +37,7 @@ function KpiStrip({ kpis, ranked, flagged, dealersLoading, actions }) {
   const p = kpis.data?.previous || {};
   const v = (fmt, x) => (kpis.loading ? '…' : fmt(x));
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
       <KpiCard label="Avoidable (paid)" value={v(formatINR, c.avoidable_paid_inr)} current={c.avoidable_paid_inr} previous={p.avoidable_paid_inr} betterWhen="down"
         sub={kpis.loading ? '' : `NFF ${formatINR(c.nff_paid_inr)} · labor ${formatINR(c.excess_labor_paid_inr)}`}
         info="Paid claims: the whole claim if NFF or a repeat repair, otherwise labor billed above the SRT maximum × ₹1,500/h. Out-of-coverage claims are a separate policy check." onClick={() => actions.setTab('dealers')} />

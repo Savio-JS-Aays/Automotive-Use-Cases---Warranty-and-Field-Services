@@ -27,7 +27,7 @@ export default function ForecastTab({ filters, fkey, local, actions }) {
 
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
         <div className="flex items-center gap-2">
           <span className="text-slate-500 font-medium">Horizon</span>
           <Segmented value={horizon} onChange={local.setHorizon} options={[6, 12, 24].map((h) => ({ value: h, label: `${h} mo` }))} />
@@ -122,7 +122,7 @@ function Kpis({ forecast, calibration, risk, factor, horizon }) {
       info: 'Connected fleet: vehicle-parts at the selected risk level whose warranty has not expired, and how many are predicted to fail before it does.' },
   ];
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
       {cards.map((k) => <KpiCard key={k.label} {...k} />)}
     </div>
   );

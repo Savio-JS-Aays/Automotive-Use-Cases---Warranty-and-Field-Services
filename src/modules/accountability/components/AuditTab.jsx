@@ -30,7 +30,7 @@ export default function AuditTab({ filters, fkey, local, lookups, actions }) {
 function RuleCards({ state, local }) {
   const d = state.data;
   const byRule = Object.fromEntries((d?.by_rule || []).map((r) => [r.rule, r]));
-  const box = 'bg-white rounded-xl shadow-sm border border-slate-200 p-3 text-left';
+  const box = 'bg-white rounded-2xl shadow-sm border border-slate-200 p-3 text-left';
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
       <div className={box}>

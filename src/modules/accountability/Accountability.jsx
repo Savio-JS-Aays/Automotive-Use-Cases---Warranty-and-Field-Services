@@ -5,7 +5,7 @@ import { useFilterStore } from '../../store/useFilterStore';
 import { useAccountabilityStore, readStateFromUrl, writeStateToUrl, claimsAnalyticsHref, regionBasisFor, CHIP_LABELS } from './store';
 import { buildFilters, scorecardFilters, fetchLookups, fetchCaseDetail, BackendMissingError, PERIOD_LABELS } from './api';
 import { useAsync } from '../../lib/analytics';
-import { Segmented } from '../../components/analytics/ui';
+import { PageHeader, Segmented } from '../../components/analytics/ui';
 import { ClaimDrawer } from '../claims-analytics/components/Drawers';
 import SummaryTab from './components/SummaryTab';
 import DealerTab from './components/DealerTab';
@@ -80,7 +80,7 @@ export default function Accountability() {
         {TABS.map((t) => (
           <button key={t.key} type="button" onClick={() => local.setTab(t.key)}
             className={`px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 -mb-px transition-colors ${
-              tab === t.key ? 'border-sky-600 text-sky-700' : 'border-transparent text-slate-500 hover:text-slate-800'
+              tab === t.key ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}>
             {t.label}
           </button>
@@ -136,16 +136,11 @@ function BackendMissing() {
 
 function Header({ chips }) {
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col md:flex-row md:items-center justify-between gap-2">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Dealer &amp; Supplier Accountability</h1>
-        <p className="text-slate-500 text-sm mt-0.5">Which dealers and suppliers drive avoidable or recoverable warranty cost, and how much comes back.</p>
-      </div>
-      <div className="text-xs text-slate-500 md:text-right space-y-1">
-        <p>Amounts in ₹ (INR) · data as of 2026-09-24 · recovery lifecycle is a labelled demo seed</p>
-        <Link to={claimsAnalyticsHref(chips)} className="inline-block font-semibold text-sky-700 hover:underline">Open in Claims &amp; Repair ↗</Link>
-      </div>
-    </div>
+    <PageHeader title="Dealer & Supplier Accountability" page={4}
+      description="Which dealers and suppliers drive avoidable or recoverable warranty cost, and how much comes back.">
+      <p>Amounts in ₹ (INR) · data as of 2026-09-24 · recovery lifecycle is a labelled demo seed</p>
+      <Link to={claimsAnalyticsHref(chips)} className="inline-block font-semibold text-blue-700 hover:underline">Open in Claims &amp; Repair ↗</Link>
+    </PageHeader>
   );
 }
 
@@ -171,7 +166,7 @@ function FilterBar({ local, lookups }) {
   ];
   const effectiveBasis = regionBasisFor(local);
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 px-4 py-3">
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 px-4 py-3">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <div className="flex items-center gap-2 text-xs">
           <span className="text-slate-500 font-medium">Region basis</span>

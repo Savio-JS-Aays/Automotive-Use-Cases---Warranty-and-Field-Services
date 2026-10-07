@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useFilterStore } from '../../store/useFilterStore';
 import { fetchOverviewData } from './api';
+import { KpiCard, PageHeader } from '../../components/analytics/ui';
 import {
-  FolderOpen, DollarSign, Clock, RefreshCcw, AlertCircle, Cpu, HelpCircle
+  HelpCircle
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell
@@ -30,32 +31,12 @@ function InfoTooltip({ text }) {
   );
 }
 
-function KpiCard({ title, value, subtext, icon: Icon, iconBg, iconColor, tooltipText }) {
-  return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5 flex flex-col justify-between hover:shadow-md transition-shadow">
-      <div className="flex justify-between items-start mb-2">
-        <div className="flex items-center">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{title}</p>
-          <InfoTooltip text={tooltipText} />
-        </div>
-        <div className={`p-2 rounded-lg ${iconBg}`}>
-          <Icon className={`w-5 h-5 ${iconColor}`} strokeWidth={2} />
-        </div>
-      </div>
-      <div>
-        <p className="text-3xl font-bold text-slate-900">{value}</p>
-        <p className="text-xs text-slate-400 mt-1">{subtext}</p>
-      </div>
-    </div>
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Chart Cards
 // ---------------------------------------------------------------------------
 function SpendVsRecoveryChart({ data }) {
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5 flex flex-col h-full">
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col h-full">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h3 className="text-sm font-bold text-slate-900">Liability vs Recovery</h3>
@@ -92,7 +73,7 @@ function SpendVsRecoveryChart({ data }) {
 
 function ClaimsBySystemChart({ data }) {
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5 flex flex-col h-full">
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col h-full">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h3 className="text-sm font-bold text-slate-900">Claims by Subsystem</h3>
@@ -149,63 +130,55 @@ export default function WarrantyOverview() {
       title: 'Open Claims',
       value: data.kpis.openClaims.toLocaleString(),
       subtext: 'Total unresolved field cases',
-      icon: FolderOpen, iconBg: 'bg-sky-50', iconColor: 'text-sky-600',
+      accent: 'blue',
       tooltipText: 'Count of all warranty claims that have not yet been marked as Closed or Paid within the selected filters.'
     },
     {
       title: 'Monthly Spend',
       value: formatCurrency(data.kpis.monthlySpend),
       subtext: 'Adjudicated financial payout',
-      icon: DollarSign, iconBg: 'bg-emerald-50', iconColor: 'text-emerald-600',
+      accent: 'emerald',
       tooltipText: 'Total monetary value of claims that have been formally paid out within the selected timeframe.'
     },
     {
       title: 'Avg Adjudication Time',
       value: `${data.kpis.avgAdjudication} Days`,
       subtext: 'Claim submission to resolution',
-      icon: Clock, iconBg: 'bg-purple-50', iconColor: 'text-purple-600',
+      accent: 'violet',
       tooltipText: 'The average number of days elapsed between a dealer submitting a claim and the warranty team rendering a final decision.'
     },
     {
       title: 'Recovery Rate',
       value: `${data.kpis.recoveryRate}%`,
       subtext: 'Subrogation success vs supplier liability',
-      icon: RefreshCcw, iconBg: 'bg-blue-50', iconColor: 'text-blue-600',
+      accent: 'blue',
       tooltipText: 'The percentage of dollars successfully clawed back from suppliers relative to the total financial exposure caused by supplier defects.'
     },
     {
       title: 'NFF Rate',
       value: `${data.kpis.nffRate}%`,
       subtext: 'No Fault Found diagnostic waste',
-      icon: AlertCircle, iconBg: 'bg-amber-50', iconColor: 'text-amber-600',
+      accent: 'amber',
       tooltipText: 'Percentage of returned parts that were tested and found to have no defects, indicating dealer misdiagnosis.'
     },
     {
       title: 'AI Flagged Anomalies',
       value: data.kpis.aiFlagged.toLocaleString(),
       subtext: 'Claims exceeding risk threshold',
-      icon: Cpu, iconBg: 'bg-rose-50', iconColor: 'text-rose-600',
+      accent: 'rose',
       tooltipText: 'Number of claims flagged by the NLP engine for displaying patterns of fraud, inflation, or emerging catastrophic failure.'
     },
   ];
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header Banner */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-slate-900">Warranty Overview</h1>
-            <span className="bg-sky-100 text-sky-700 text-xs font-bold px-2 py-0.5 rounded tracking-wide">PAGE 1</span>
-          </div>
-          <p className="text-slate-500 mt-1">High-level executive summary of warranty financial exposure and recovery metrics.</p>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <PageHeader title="Warranty Overview" page={1}
+        description="High-level executive summary of warranty financial exposure and recovery metrics." />
 
       {/* KPI Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
         {dynamicKpis.map((kpi) => (
-          <KpiCard key={kpi.title} {...kpi} />
+          <KpiCard key={kpi.title} label={kpi.title} value={kpi.value} sub={kpi.subtext} info={kpi.tooltipText} accent={kpi.accent} />
         ))}
       </div>
 

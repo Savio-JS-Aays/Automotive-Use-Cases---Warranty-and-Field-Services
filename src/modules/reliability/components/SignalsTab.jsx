@@ -70,9 +70,9 @@ export default function SignalsTab({ filters, fkey, local, actions, lookups }) {
 function KpiStrip({ kpis }) {
   if (kpis.loading && !kpis.data) {
     return (
-      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {Array.from({ length: 7 }).map((_, i) => (
-          <div key={i} className="bg-white rounded-xl border border-slate-200 h-[104px] flex items-center justify-center"><Loader2 className="w-4 h-4 animate-spin text-slate-300" /></div>
+          <div key={i} className="bg-white rounded-2xl border border-slate-200 border-t-[3px] h-[124px] flex items-center justify-center"><Loader2 className="w-4 h-4 animate-spin text-slate-300" /></div>
         ))}
       </div>
     );
@@ -98,7 +98,7 @@ function KpiStrip({ kpis }) {
       sub: `of ${formatNumber(cur.telematics_claims)} telematics claims`, info: 'Share of telematics claims whose failure had been predicted by the health model before it happened.' },
   ];
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
       {cards.map((k) => <KpiCard key={k.label} {...k} />)}
     </div>
   );

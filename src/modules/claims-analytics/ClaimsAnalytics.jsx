@@ -5,7 +5,7 @@ import { useFilterStore } from '../../store/useFilterStore';
 import { useClaimsAnalyticsStore, readStateFromUrl, writeStateToUrl } from './store';
 import { buildFilters, fetchKpis, fetchLookups, BackendMissingError } from './api';
 import { useAsync } from './lib';
-import { KpiCard } from '../../components/analytics/ui';
+import { KpiCard, PageHeader } from '../../components/analytics/ui';
 import FilterBar from './components/FilterBar';
 import SummaryTab from './components/SummaryTab';
 import FailureTab from './components/FailureTab';
@@ -123,10 +123,10 @@ export default function ClaimsAnalytics() {
       <Header asOf={kpis.data?.as_of} />
       <FilterBar local={local} actions={actions} subsystems={lookups?.subsystems} />
 
-      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {kpis.loading && !kpis.data
           ? Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="bg-white rounded-xl border border-slate-200 h-[104px] flex items-center justify-center">
+            <div key={i} className="bg-white rounded-2xl border border-slate-200 border-t-[3px] h-[124px] flex items-center justify-center">
               <Loader2 className="w-4 h-4 animate-spin text-slate-300" />
             </div>
           ))
@@ -138,7 +138,7 @@ export default function ClaimsAnalytics() {
         {TABS.map((t) => (
           <button key={t.key} type="button" onClick={() => local.setTab(t.key)}
             className={`px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 -mb-px transition-colors ${
-              local.tab === t.key ? 'border-sky-600 text-sky-700' : 'border-transparent text-slate-500 hover:text-slate-800'
+              local.tab === t.key ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}>
             {t.label}
           </button>
@@ -161,15 +161,10 @@ export default function ClaimsAnalytics() {
 
 function Header({ asOf }) {
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col md:flex-row md:items-center justify-between gap-2">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Claims &amp; Repair Analytics</h1>
-        <p className="text-slate-500 text-sm mt-0.5">Warranty claims and repair orders: cost, failures, labor billing and claim processing.</p>
-      </div>
-      <div className="text-xs text-slate-500 md:text-right">
-        <p>Amounts in ₹ (INR) · distance in km</p>
-        {asOf && <p>Data as of <strong>{asOf}</strong></p>}
-      </div>
-    </div>
+    <PageHeader title="Claims & Repair Analytics" page={2}
+      description="Warranty claims and repair orders: cost, failures, labor billing and claim processing.">
+      <p>Amounts in ₹ (INR) · distance in km</p>
+      {asOf && <p>Data as of <strong>{asOf}</strong></p>}
+    </PageHeader>
   );
 }
