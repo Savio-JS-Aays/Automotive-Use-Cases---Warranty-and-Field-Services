@@ -56,7 +56,7 @@ export const fetchClaimsPage = (f, limit = 20) =>
 export async function fetchLookups() {
   const [parts, clusters] = await Promise.all([
     supabase.from('dim_part').select('part_id, part_name, vehicle_subsystem, b10_design_life_miles').order('part_name'),
-    supabase.from('wty_dim_failure_cluster').select('cluster_id, cluster_name, source, status, first_seen, last_seen'),
+    supabase.from('wty_dim_failure_cluster').select('cluster_id, cluster_name, source, subsystem, status, first_seen, last_seen'),
   ]);
   return {
     parts: parts.data || [],

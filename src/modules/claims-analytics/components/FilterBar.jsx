@@ -1,18 +1,13 @@
 import React, { useState } from 'react';
 import { SlidersHorizontal, X } from 'lucide-react';
 import { CHIP_LABELS } from '../store';
-import { MIS_BUCKETS, KM_BUCKETS, STATUS_GROUPS } from '../lib';
+import { STATUS_GROUPS } from '../lib';
 import { Segmented } from '../../../components/analytics/ui';
 
 const OPTION_GROUPS = [
   { key: 'status_group', label: 'Status group', options: STATUS_GROUPS },
   { key: 'status', label: 'Status', options: ['Open', 'Submitted', 'In Review', 'Paid', 'Rejected'] },
   { key: 'liability_type', label: 'Liability', options: ['OEM', 'Supplier'] },
-  { key: 'claim_source', label: 'Claim source', options: [{ value: 'seed', label: 'Seed' }, { value: 'telematics_sim', label: 'Telematics' }] },
-  { key: 'risk_band', label: 'AI risk band', options: ['Low', 'Medium', 'High'] },
-  { key: 'dealer_tier', label: 'Dealer tier', options: ['Platinum', 'Gold', 'Silver'] },
-  { key: 'mis_bucket', label: 'Months in service', options: MIS_BUCKETS },
-  { key: 'km_bucket', label: 'km at failure', options: KM_BUCKETS },
 ];
 
 const norm = (o) => (typeof o === 'string' ? { value: o, label: o } : o);
@@ -27,7 +22,7 @@ export default function FilterBar({ local, actions, subsystems }) {
   ].filter(Boolean);
   const active = chipEntries.length + flags.length;
 
-  const groups = [...OPTION_GROUPS.slice(0, 5), { key: 'subsystem', label: 'Subsystem', options: subsystems || [] }, ...OPTION_GROUPS.slice(5)];
+  const groups = [...OPTION_GROUPS, { key: 'subsystem', label: 'Subsystem', options: subsystems || [] }];
 
   const toggle = (key, opt) => {
     const selected = (local.chips[key] || []).some((c) => c.value === opt.value);
@@ -38,14 +33,6 @@ export default function FilterBar({ local, actions, subsystems }) {
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 px-4 py-3">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <div className="flex items-center gap-2 text-xs">
-          <span className="text-slate-500 font-medium">Date basis</span>
-          <Segmented value={local.dateBasis} onChange={actions.setDateBasis} options={[{ value: 'submission', label: 'Submission' }, { value: 'adjudication', label: 'Adjudication' }]} />
-        </div>
-        <div className="flex items-center gap-2 text-xs">
-          <span className="text-slate-500 font-medium">Region basis</span>
-          <Segmented value={local.regionBasis} onChange={actions.setRegionBasis} options={[{ value: 'vehicle', label: 'Vehicle' }, { value: 'dealer', label: 'Dealer' }]} />
-        </div>
         <div className="flex-1" />
         <button type="button" onClick={() => setOpen((v) => !v)} className={`flex items-center gap-1.5 text-xs font-medium border rounded-md px-2.5 py-1.5 ${open ? 'bg-sky-50 border-sky-300 text-sky-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
           <SlidersHorizontal className="w-3.5 h-3.5" /> More filters {active > 0 && <span className="bg-sky-600 text-white rounded-full px-1.5 text-[10px]">{active}</span>}
@@ -95,11 +82,6 @@ export default function FilterBar({ local, actions, subsystems }) {
             <Segmented size="xs" value={local.nff === null ? 'any' : local.nff ? 'yes' : 'no'}
               onChange={(v) => actions.setNff(v === 'any' ? null : v === 'yes')}
               options={[{ value: 'any', label: 'Any' }, { value: 'yes', label: 'NFF' }, { value: 'no', label: 'Fault found' }]} />
-          </div>
-          <div className="flex flex-col gap-1.5 text-xs text-slate-600">
-            <p className="text-[11px] font-semibold text-slate-500">Flags</p>
-            <label className="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" className="accent-sky-600" checked={local.repeatOnly} onChange={(e) => actions.setRepeatOnly(e.target.checked)} /> Repeat repairs only (same vehicle + part ≤ 90 days)</label>
-            <label className="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" className="accent-sky-600" checked={local.overrunOnly} onChange={(e) => actions.setOverrunOnly(e.target.checked)} /> Labor overrun only (billed &gt; SRT max)</label>
           </div>
         </div>
       )}

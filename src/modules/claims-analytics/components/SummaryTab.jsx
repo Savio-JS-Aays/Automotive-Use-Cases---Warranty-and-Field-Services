@@ -5,7 +5,7 @@ import {
 import { fetchTimeseries, fetchBreakdown } from '../api';
 import { useAsync, tooltipStyle, STATUS_COLORS, num } from '../lib';
 import { Card, DataState, Segmented } from '../../../components/analytics/ui';
-import { formatINR, formatINRAxis, formatNumber, formatPct } from '../../../lib/format';
+import { formatINR, formatINRAxis, formatNumber } from '../../../lib/format';
 
 const periodLabel = (d, grain) => {
   const date = new Date(`${d}T00:00:00`);
@@ -19,7 +19,6 @@ export default function SummaryTab({ filters, fkey, actions }) {
   const series = useAsync(() => fetchTimeseries(filters, grain), `${fkey}|${grain}`);
   const liability = useAsync(() => fetchBreakdown(filters, 'liability_type', 5), fkey);
   const parts = useAsync(() => fetchBreakdown(filters, 'part', 10), fkey);
-  const variants = useAsync(() => fetchBreakdown(filters, 'variant', 10), fkey);
 
   const seriesRows = (series.data || []).map((r) => ({
     ...r,
@@ -154,27 +153,6 @@ export default function SummaryTab({ filters, fkey, actions }) {
           </DataState>
         </Card>
       </div>
-
-      {/* S6 */}
-      <Card title="Cost by variant" subtitle="Claim cost, claims, average cost and NFF rate per vehicle variant" info="Click a variant to set it as the global Variant filter.">
-        <DataState state={variants} height="h-40">
-          {(rows) => (
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-              {rows.map((r) => (
-                <button
-                  key={r.key} type="button" onClick={() => actions.setVariant(r.key)}
-                  className="text-left border border-slate-200 rounded-lg p-3 hover:border-sky-400 hover:shadow-sm transition"
-                >
-                  <p className="text-xs font-semibold text-slate-700">{r.key}</p>
-                  <p className="text-lg font-bold text-slate-900 mt-1">{formatINR(r.cost_inr)}</p>
-                  <p className="text-[11px] text-slate-500">{formatNumber(r.claims)} claims · avg {formatINR(r.avg_cost_inr)}</p>
-                  <p className="text-[11px] text-slate-500">NFF {formatPct(r.nff_rate)} · share {formatPct(r.cost_share)}</p>
-                </button>
-              ))}
-            </div>
-          )}
-        </DataState>
-      </Card>
     </div>
   );
 }

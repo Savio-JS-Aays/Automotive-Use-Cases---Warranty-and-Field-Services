@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useFilterStore } from "../store/useFilterStore";
+import { useFilterStore, DATE_PRESETS, lastNDays } from "../store/useFilterStore";
 import { useLocation, Link } from 'react-router-dom';
 import { supabase } from '../config/supabaseClient';
 
@@ -19,10 +19,49 @@ function FilterSelect({ label, value, onChange, options }) {
         onChange={(e) => onChange(e.target.value)}
         className="w-full appearance-none bg-white border border-slate-200 rounded-lg pl-3.5 pr-9 py-2.5 text-[15px] text-slate-800 shadow-sm cursor-pointer hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 bg-[url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 20 20%22 fill=%22%2364748b%22><path fill-rule=%22evenodd%22 d=%22M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z%22 clip-rule=%22evenodd%22/></svg>')] bg-no-repeat bg-[right_0.75rem_center] bg-[length:1rem]"
       >
-        {options.map((opt) => (
-          <option key={opt} value={opt}>{opt}</option>
-        ))}
+        {options.map((opt) => {
+          const o = typeof opt === 'string' ? { value: opt, label: opt } : opt;
+          return <option key={o.value} value={o.value}>{o.label}</option>;
+        })}
       </select>
+    </div>
+  );
+}
+
+const dateInputClass = 'flex-1 min-w-0 text-sm border border-slate-200 rounded-lg px-2.5 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 text-slate-700';
+
+function DateRangeFilter({ dateRange, setDateRange }) {
+  const [customOpen, setCustomOpen] = useState(false);
+  const preset = DATE_PRESETS.find((days) => {
+    const r = lastNDays(days);
+    return r.from.getTime() === dateRange.from.getTime() && r.to.getTime() === dateRange.to.getTime();
+  });
+  const value = customOpen || !preset ? 'custom' : String(preset);
+  const options = [...DATE_PRESETS.map((days) => ({ value: String(days), label: `Last ${days} days` })), { value: 'custom', label: 'Custom range' }];
+
+  const onChange = (v) => {
+    if (v === 'custom') return setCustomOpen(true);
+    setCustomOpen(false);
+    setDateRange(lastNDays(Number(v)));
+  };
+
+  return (
+    <div>
+      <FilterSelect label="Date Range" value={value} onChange={onChange} options={options} />
+      {value === 'custom' && (
+        <div className="flex flex-col gap-2.5 -mt-2 mb-5">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-bold text-slate-400 w-9">FROM</span>
+            <input type="date" value={dateRange.from.toISOString().split('T')[0]}
+              onChange={(e) => e.target.value && setDateRange({ ...dateRange, from: new Date(e.target.value) })} className={dateInputClass} />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-bold text-slate-400 w-9">TO</span>
+            <input type="date" value={dateRange.to.toISOString().split('T')[0]}
+              onChange={(e) => e.target.value && setDateRange({ ...dateRange, to: new Date(e.target.value) })} className={dateInputClass} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -121,29 +160,7 @@ function SidebarFilters() {
         )}
         
         {/* Global Date Range: Always visible */}
-        <div className="mt-1">
-           <label className="block text-sm font-semibold text-slate-700 mb-2">Date Range</label>
-           <div className="flex flex-col gap-2.5">
-             <div className="flex items-center gap-2">
-               <span className="text-[11px] font-bold text-slate-400 w-9">FROM</span>
-               <input 
-                 type="date" 
-                 value={filters.dateRange.from.toISOString().split('T')[0]}
-                 onChange={(e) => filters.setDateRange({ ...filters.dateRange, from: new Date(e.target.value) })}
-                 className="flex-1 min-w-0 text-sm border border-slate-200 rounded-lg px-2.5 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 text-slate-700"
-               />
-             </div>
-             <div className="flex items-center gap-2">
-               <span className="text-[11px] font-bold text-slate-400 w-9">TO</span>
-               <input 
-                 type="date" 
-                 value={filters.dateRange.to.toISOString().split('T')[0]}
-                 onChange={(e) => filters.setDateRange({ ...filters.dateRange, to: new Date(e.target.value) })}
-                 className="flex-1 min-w-0 text-sm border border-slate-200 rounded-lg px-2.5 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 text-slate-700"
-               />
-             </div>
-           </div>
-        </div>
+        <DateRangeFilter dateRange={filters.dateRange} setDateRange={filters.setDateRange} />
 
       </div>
     </aside>

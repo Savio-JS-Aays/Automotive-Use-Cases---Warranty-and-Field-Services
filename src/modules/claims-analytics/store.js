@@ -54,7 +54,8 @@ export const useClaimsAnalyticsStore = create((set) => ({
 }));
 
 // --- URL persistence: ?ca=<json> so a filtered view can be shared ---------------------------
-const URL_KEYS = ['tab', 'dateBasis', 'regionBasis', 'chips', 'nff', 'repeatOnly', 'overrunOnly', 'roScope'];
+// regionBasis and dateBasis are not persisted: their controls were removed, so they stay at the defaults (vehicle, submission)
+const URL_KEYS = ['tab', 'chips', 'nff', 'repeatOnly', 'overrunOnly', 'roScope'];
 
 export function readStateFromUrl(search) {
   try {

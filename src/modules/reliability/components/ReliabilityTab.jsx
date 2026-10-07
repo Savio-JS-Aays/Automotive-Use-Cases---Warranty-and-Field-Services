@@ -1,15 +1,16 @@
 import React from 'react';
 import {
-  ResponsiveContainer, ScatterChart, Scatter, LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  ReferenceLine, ReferenceArea,
+  ResponsiveContainer, ScatterChart, Scatter, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  ReferenceLine,
 } from 'recharts';
 import {
   fetchWeibull, fetchCalibration, fetchBreakdown, fetchSignalDetail, fetchPrecursors,
 } from '../api';
 import { useAsync, tooltipStyle, num, CHART_COLORS } from '../../../lib/analytics';
-import { Card, DataState, KpiCard, Segmented } from '../../../components/analytics/ui';
+import { Card, DataState, InfoTooltip, KpiCard, Segmented } from '../../../components/analytics/ui';
 import { formatINR, formatKm, formatNumber, formatPct } from '../../../lib/format';
-import { weibullF, weibullHazard, weibullY, betaReading, WARRANTY_MONTHS, WARRANTY_KM } from '../lib';
+import { weibullY } from '../lib';
+import { ChevronRight } from 'lucide-react';
 import { ConnectedTag } from './common';
 
 // Design: docs/modules/reliability-early-warning/design.md §7
@@ -20,7 +21,6 @@ const lifeFmt = (basis) => (v) => (basis === 'km' ? formatKm(v) : `${formatNumbe
 export default function ReliabilityTab({ filters, local, lookups, partId: chosenPartId, actions }) {
   const basis = local.basis;
   const fmt = lifeFmt(basis);
-  const limit = basis === 'km' ? WARRANTY_KM : WARRANTY_MONTHS;
 
   // Catalogue view (all parts) ignores the part / subsystem chips
   const { part_id: _part, subsystem: _sub, ...catalogueFilters } = filters;
@@ -46,15 +46,15 @@ export default function ReliabilityTab({ filters, local, lookups, partId: chosen
   return (
     <div className="space-y-4">
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
-        <label className="flex items-center gap-2">
-          <span className="text-slate-500 font-medium">Part</span>
-          <select value={partId || ''} onChange={(e) => actions.focusPart(e.target.value, lookups?.partById?.[e.target.value]?.part_name)}
-            className="border border-slate-200 rounded-md px-2 py-1 text-xs bg-white max-w-xs">
-            {(lookups?.parts || []).map((p) => <option key={p.part_id} value={p.part_id}>{p.part_name}</option>)}
-          </select>
-        </label>
+        <span className="flex items-center gap-2">
+          <span className="text-slate-500 font-medium">Showing</span>
+          <span className="font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-md px-2 py-0.5">{partName || '—'}</span>
+          <span className="text-slate-400">· click a part in “Does each part last as long as designed?” to change it</span>
+        </span>
         <div className="flex items-center gap-2">
-          <span className="text-slate-500 font-medium">Life basis</span>
+          <span className="text-slate-500 font-medium flex items-center">Life basis
+            <InfoTooltip text="How a part's age is measured when fitting its life curve. Months in service = time since the vehicle entered service; it covers the whole fleet (about 10,000 vehicles). km (connected fleet) = odometer reading at failure; only the 200 connected vehicles report mileage, so there are fewer failures but it is the only basis that can be compared with the design life, which is specified in km." />
+          </span>
           <Segmented value={basis} onChange={local.setBasis} options={[{ value: 'mis', label: 'Months in service' }, { value: 'km', label: 'km (connected fleet)' }]} />
         </div>
         <span className="text-slate-400">Lifetime view: the date range does not apply on this tab.</span>
@@ -62,77 +62,20 @@ export default function ReliabilityTab({ filters, local, lookups, partId: chosen
 
       <PartKpis fit={fit} calRow={calRow} basis={basis} fmt={fmt} loading={all.loading} />
 
-      {/* R1 Weibull probability plot is hidden */}
-
-      {/* R2 */}
-      <Card title="Failure probability and hazard"
-        subtitle="F(t) = share of units failed by age t · h(t) = instantaneous failure rate"
-        info="From the fitted β and η. The shaded band is the base warranty window; the label gives the share of units expected to fail inside it.">
-        <DataState state={all} empty="No fit.">
-          {() => (fit?.fit_ok ? <CurvePlot fit={fit} basis={basis} fmt={fmt} limit={limit} /> : <Insufficient fit={fit} />)}
-        </DataState>
-      </Card>
-
       {/* R3 */}
       <Card title="Does each part last as long as designed?"
-        subtitle="Mileage by which 10% of units have failed (observed B10) compared with the design B10 · parts that wear out earliest first"
+        subtitle="Mileage by which 10% of units have failed (observed B10) compared with the design B10 · parts that wear out earliest first · click a part to drill into suppliers, production months and telemetry"
         info="Observed B10 comes from the Weibull fit on the connected fleet (km). Design B10 is dim_part.b10_design_life_miles (stored in km). A part more than 20% below its design life is flagged for design review (wty_config calib_gap_review). Hover a bar for a plain-language reading."
         actions={<ConnectedTag />}>
         <DataState state={calibration} empty="No parts with a usable km fit.">
-          {(rows) => <DesignLifeChart rows={rows} selected={partId} onSelect={(r) => actions.focusPart(r.part_id, r.part_name, 'reliability')} />}
+          {(rows) => (
+            <DesignLifeChart rows={rows} selected={partId} onSelect={(r) => actions.focusPart(r.part_id, r.part_name, 'reliability')}
+              drill={<PartDrill partName={partName} suppliers={suppliers} containment={containment} precursors={precursors} />} />
+          )}
         </DataState>
       </Card>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        {/* R4 */}
-        <Card title="Suppliers for this part" subtitle="All claims for the part (lifetime), by liable supplier"
-          info="Per-supplier Weibull curves are not possible: we don't know which supplier's part is on the vehicles that have not failed. These failures-only metrics compare suppliers instead.">
-          <DataState state={suppliers} height="h-40" empty="No claims for this part.">
-            {(rows) => {
-              const total = rows.reduce((s, r) => s + Number(r.claims), 0);
-              return (
-                <table className="w-full text-xs">
-                  <thead><tr className="text-[11px] text-slate-500 border-b border-slate-100">
-                    <th className="text-left font-semibold py-1.5">Supplier</th><th className="text-right font-semibold">Claims</th><th className="text-right font-semibold">Share</th>
-                    <th className="text-right font-semibold">Cost</th><th className="text-right font-semibold">NFF</th><th className="text-right font-semibold">Recovered</th>
-                  </tr></thead>
-                  <tbody>
-                    {rows.map((r) => (
-                      <tr key={r.key} className="border-b border-slate-50">
-                        <td className="py-1.5 text-slate-700">{r.key}</td>
-                        <td className="text-right tabular-nums">{r.claims}</td>
-                        <td className="text-right tabular-nums">{formatPct(Number(r.claims) / total, 0)}</td>
-                        <td className="text-right tabular-nums">{formatINR(r.cost_inr)}</td>
-                        <td className="text-right tabular-nums">{formatPct(r.nff_rate, 0)}</td>
-                        <td className="text-right tabular-nums text-emerald-700">{formatINR(r.recovered_inr)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              );
-            }}
-          </DataState>
-        </Card>
-
-        {/* R5 */}
-        <Card title="Production-month containment" subtitle="Claims per 1,000 vehicles built, by production month (lifetime)"
-          info="Production month stands in for a batch: the schema has no batch id. The dashed line is the average over months with at least one claim. A few months far above it suggest a batch problem; an even spread suggests design or usage.">
-          <DataState state={containment} height="h-56" empty="No claims for this part.">
-            {(d) => <Containment rows={d.by_production_month || []} />}
-          </DataState>
-        </Card>
-      </div>
-
-      {/* R6 duty-cycle severity vs failure rate is hidden */}
-
-      {/* R7 */}
-      <Card title="Leading telemetry signals" subtitle="Mean |z-score| 30–21 days vs 7–1 days before a failure of this part"
-        info="From v_failure_precursor_summary. A large rise from early to late means the signal drifts before the part fails, so it can be used for early warning."
-        actions={<ConnectedTag />}>
-        <DataState state={precursors} height="h-56" empty="No telemetry precursors recorded for this part.">
-          {(rows) => <PrecursorChart rows={rows} />}
-        </DataState>
-      </Card>
+      {/* R4 suppliers, R5 production-month containment and R7 telemetry precursors are drill-downs of R3 */}
     </div>
   );
 }
@@ -154,18 +97,15 @@ function PartKpis({ fit, calRow, basis, fmt, loading }) {
   const kmOk = Boolean(calRow?.fit_ok_km);
   const gap = kmOk ? num(calRow?.b10_gap) : null;
   const cards = [
-    { label: 'Observed B10', value: ok ? fmt(fit.b10_life) : '—', sub: '10% of units failed', info: 'Life by which 10% of units are expected to have failed, from the Weibull fit with suspensions.' },
-    { label: 'Design B10', value: design ? formatKm(design) : '—',
-      sub: design ? 'design life (km)' : 'none on file',
-      info: 'Design life from dim_part.b10_design_life_miles (the values are km despite the column name). It is a distance, so the gap is always measured against the km fit on the connected fleet.' },
-    { label: 'Calibration gap', value: gap === null ? '—' : `${gap > 0 ? '+' : gap < 0 ? '−' : ''}${formatPct(Math.abs(gap), 0)}`,
+    { label: `Observed B10 (${basis === 'km' ? 'km' : 'months'})`, value: ok ? fmt(fit.b10_life) : '—', sub: `10% of units failed · ${fit.n_fail} failures`, info: 'Life by which 10% of units are expected to have failed, from the Weibull fit with suspensions.' },
+    { label: 'Design B10 (km)', value: design ? formatKm(design) : '—',
+      sub: design ? 'fixed spec · same on both bases' : 'none on file',
+      info: 'The design life comes from the part specification (dim_part.b10_design_life_miles; the values are km despite the column name). It is only defined as a distance, so it does not change with the life basis and is always compared with the km fit on the connected fleet.' },
+    { label: 'Calibration gap (km)', value: gap === null ? '—' : `${gap > 0 ? '+' : gap < 0 ? '−' : ''}${formatPct(Math.abs(gap), 0)}`,
       sub: gap === null
         ? (design ? 'too few km failures' : '')
         : `${gap <= -0.2 ? 'design review' : gap < 0 ? 'below design' : 'meets design'} · ${formatKm(calRow.b10_km)}`,
       info: 'Observed B10 on the km fit ÷ design B10 − 1. Below −20% triggers "Design review" (wty_config calib_gap_review). Needs at least 5 km-recorded failures.' },
-    { label: 'β shape', value: ok ? formatNumber(fit.beta, 2) : '—', sub: ok ? betaReading(num(fit.beta)) : '', info: 'β < 1: failures concentrate early in life (build quality). β ≈ 1: random. β > 1: wear-out.' },
-    { label: 'η / B50', value: ok ? `${fmt(fit.eta)}` : '—', sub: ok ? `median life ${fmt(fit.b50_life)}` : '', info: 'η: life by which 63.2% of units fail. B50: median life.' },
-    { label: 'Fit quality R²', value: ok ? formatNumber(fit.r2, 2) : '—', sub: `${fit.n_fail} failures · ${formatNumber(fit.n_units - fit.n_fail)} running`, info: 'R² of the straight line on Weibull paper. Fits with fewer than 5 failures are not shown.' },
     { label: 'P(fail in warranty)', value: formatPct(basis === 'km' ? calRow?.p_fail_in_warranty_km : calRow?.p_fail_in_warranty),
       sub: basis === 'km' ? 'within 300,000 km' : 'within 36 months', info: 'Share of units expected to fail before the base warranty limit, F(limit).' },
   ];
@@ -176,9 +116,6 @@ function PartKpis({ fit, calRow, basis, fmt, loading }) {
   );
 }
 
-function Insufficient({ fit }) {
-  return <p className="h-64 flex items-center justify-center text-xs text-slate-400 text-center px-6">Insufficient data: {fit?.n_fail ?? 0} failures (a fit needs at least 5).</p>;
-}
 
 // ---------------------------------------------------------------------------
 function logSpace(a, b, n = 40) {
@@ -229,40 +166,6 @@ function WeibullPlot({ base, variant, basis, fmt, limit }) {
   );
 }
 
-function CurvePlot({ fit, basis, fmt, limit }) {
-  const beta = num(fit.beta);
-  const eta = num(fit.eta);
-  const tMax = Math.max(limit * 2, Math.min(num(fit.b50_life) * 1.2, limit * 6));
-  const per = basis === 'km' ? 10000 : 1;
-  const data = Array.from({ length: 60 }, (_, i) => {
-    const t = (tMax * (i + 1)) / 60;
-    return { t, F: weibullF(t, beta, eta), h: weibullHazard(t, beta, eta) * per * 1000 };
-  });
-  const inside = weibullF(limit, beta, eta);
-  return (
-    <div className="h-80 flex flex-col">
-      <p className="text-xs text-slate-600 mb-1">
-        <strong>{formatPct(inside, 1)}</strong> of units are expected to fail inside the base warranty ({fmt(limit)}).
-      </p>
-      <div className="flex-1">
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 4, right: 4, left: -8, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-            <XAxis dataKey="t" type="number" domain={[0, tMax]} tickFormatter={fmt} tick={{ fontSize: 11, fill: '#64748b' }} />
-            <YAxis yAxisId="F" tickFormatter={(v) => formatPct(v, 0)} tick={{ fontSize: 11, fill: '#64748b' }} width={40} />
-            <YAxis yAxisId="h" orientation="right" tick={{ fontSize: 11, fill: '#64748b' }} width={40} />
-            <ReferenceArea yAxisId="F" x1={0} x2={limit} fill="#e0f2fe" fillOpacity={0.6} />
-            <Tooltip {...tooltipStyle} labelFormatter={fmt}
-              formatter={(v, n) => (n === 'F(t)' ? formatPct(v, 2) : `${formatNumber(v, 2)} per 1,000 units per ${basis === 'km' ? '10k km' : 'month'}`)} />
-            <Legend wrapperStyle={{ fontSize: 11 }} />
-            <Line yAxisId="F" dataKey="F" name="F(t)" stroke="#0284c7" strokeWidth={2} dot={false} />
-            <Line yAxisId="h" dataKey="h" name="h(t)" stroke="#f97316" strokeDasharray="4 3" dot={false} />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // R3: does each part last as long as it was designed to? One bar per part, centred on "= design life".
@@ -278,8 +181,9 @@ const LIFE_GROUPS = [
 ];
 const lifeGroup = (gap) => (gap <= -DESIGN_BAND ? 'early' : gap >= DESIGN_BAND ? 'outlasts' : 'close');
 
-function DesignLifeChart({ rows, selected, onSelect }) {
+function DesignLifeChart({ rows, selected, onSelect, drill }) {
   const [filter, setFilter] = React.useState(null);
+  const [openId, setOpenId] = React.useState(null);
   const [showAll, setShowAll] = React.useState(false);
   const data = rows.filter((r) => r.fit_ok_km && r.design_b10_km && r.b10_gap !== null)
     .map((r) => ({ ...r, obs: num(r.b10_km), design: num(r.design_b10_km), gap: num(r.b10_gap), group: lifeGroup(num(r.b10_gap)) }))
@@ -328,11 +232,17 @@ function DesignLifeChart({ rows, selected, onSelect }) {
           const capped = r.gap > GAP_CAP;
           const sooner = r.gap < 0;
           const sentence = `10% of ${r.part_name} units fail by ${formatKm(r.obs)}. The design expects ${formatKm(r.design)}, so it ${sooner ? 'wears out' : 'lasts'} ${formatPct(Math.abs(r.gap), 0)} ${sooner ? 'sooner' : 'longer'}.`;
+          const open = openId === r.part_id && selected === r.part_id;
           return (
-            <button key={r.part_id} type="button" onClick={() => onSelect(r)} title={sentence}
-              className={`group w-full grid grid-cols-[15rem_1fr_10rem] items-center gap-3 py-1 rounded text-left ${r.part_id === selected ? 'bg-sky-50 ring-1 ring-sky-200' : 'hover:bg-slate-50'}`}>
+            <React.Fragment key={r.part_id}>
+            <button type="button" title={sentence} aria-expanded={open}
+              onClick={() => { setOpenId(open ? null : r.part_id); if (!open) onSelect(r); }}
+              className={`group w-full grid grid-cols-[15rem_1fr_10rem] items-center gap-3 py-1 rounded text-left ${r.part_id === selected ? 'bg-blue-50 ring-1 ring-blue-200' : 'hover:bg-slate-50'}`}>
               <span className="pl-1 min-w-0">
-                <span className="block text-xs text-slate-700 truncate">{r.part_name}</span>
+                <span className="flex items-center gap-1 text-xs text-slate-700">
+                  <ChevronRight className={`w-3.5 h-3.5 flex-shrink-0 text-slate-400 transition-transform ${open ? 'rotate-90 text-blue-600' : ''}`} />
+                  <span className="truncate">{r.part_name}</span>
+                </span>
                 {num(r.beta_km) < 1 && <span className="block text-[10px] leading-3 text-slate-400" title="Weibull β below 1: failures cluster early in life">early-life failures</span>}
               </span>
               <span className="relative h-5">
@@ -349,12 +259,14 @@ function DesignLifeChart({ rows, selected, onSelect }) {
                 <span className="text-slate-400"> · {k(r.obs)} vs {k(r.design)} km</span>
               </span>
             </button>
+            {open && drill}
+            </React.Fragment>
           );
         })}
       </div>
 
       <div className="flex items-center justify-between text-[11px] text-slate-500">
-        <span>Shaded band = within ±{DESIGN_BAND * 100}% of design. Bars stop at +{Math.round(GAP_CAP * 100)}% (›); the label shows the exact value. Connected fleet, km basis. Click a part to inspect it.</span>
+        <span>Shaded band = within ±{DESIGN_BAND * 100}% of design. Bars stop at +{Math.round(GAP_CAP * 100)}% (›); the label shows the exact value. Connected fleet, km basis. Click a part to drill into it.</span>
         {!filter && visible.length > 12 && (
           <button type="button" onClick={() => setShowAll((v) => !v)} className="font-semibold text-sky-700 hover:underline whitespace-nowrap">
             {showAll ? 'Show 12 most at risk' : `Show all ${visible.length} parts`}
@@ -430,5 +342,100 @@ function PrecursorChart({ rows }) {
         </BarChart>
       </ResponsiveContainer>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Drill-down for one part of R3: suppliers (R4), production-month containment (R5), telemetry precursors (R7)
+// ---------------------------------------------------------------------------
+const DRILL_VIEWS = [
+  { value: 'suppliers', label: 'Suppliers' },
+  { value: 'production', label: 'Production month' },
+  { value: 'telemetry', label: 'Telemetry signals' },
+];
+
+const DRILL_TEXT = {
+  suppliers: {
+    title: 'Suppliers for this part',
+    sub: 'All claims for the part (lifetime), by liable supplier',
+    info: "Per-supplier life curves are not possible: we don't know which supplier's part is on the vehicles that have not failed. These failures-only metrics compare suppliers instead.",
+  },
+  production: {
+    title: 'Production-month containment',
+    sub: 'Claims per 1,000 vehicles built, by production month (lifetime)',
+    info: 'Production month stands in for a batch: the schema has no batch id. A few months far above the dashed average suggest a batch problem; an even spread suggests design or usage.',
+  },
+  telemetry: {
+    title: 'Leading telemetry signals',
+    sub: 'Mean |z-score| 30–21 days vs 7–1 days before a failure of this part',
+    info: 'From v_failure_precursor_summary. A large rise from early to late means the signal drifts before the part fails, so it can be used for early warning.',
+  },
+};
+
+function PartDrill({ partName, suppliers, containment, precursors }) {
+  const [view, setView] = React.useState('suppliers');
+  const t = DRILL_TEXT[view];
+  return (
+    <div className="ml-5 mr-1 mt-1 mb-3 border border-blue-100 bg-blue-50/30 rounded-xl p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
+        <div>
+          <p className="text-sm font-bold text-slate-900 flex items-center gap-2">
+            {t.title}: <span className="font-semibold text-blue-700">{partName}</span>
+            {view === 'telemetry' && <ConnectedTag />}
+          </p>
+          <p className="text-xs text-slate-500 mt-0.5" title={t.info}>{t.sub}</p>
+        </div>
+        <Segmented value={view} onChange={setView} options={DRILL_VIEWS} />
+      </div>
+      <div className="bg-white rounded-lg border border-slate-200 p-3">
+        {view === 'suppliers' && (
+          <DataState state={suppliers} height="h-40" empty="No claims for this part.">
+            {(rows) => <SupplierTable rows={rows} />}
+          </DataState>
+        )}
+        {view === 'production' && (
+          <DataState state={containment} height="h-56" empty="No claims for this part.">
+            {(d) => <Containment rows={d.by_production_month || []} />}
+          </DataState>
+        )}
+        {view === 'telemetry' && (
+          <DataState state={precursors} height="h-56" empty="No telemetry precursors recorded for this part.">
+            {(rows) => <PrecursorChart rows={rows} />}
+          </DataState>
+        )}
+      </div>
+      <p className="text-[11px] text-slate-500 mt-2">{t.info}</p>
+    </div>
+  );
+}
+
+function SupplierTable({ rows }) {
+  const total = rows.reduce((s, r) => s + Number(r.claims), 0);
+  return (
+    <table className="w-full text-xs">
+      <thead><tr className="text-[11px] text-slate-500 border-b border-slate-100">
+        <th className="text-left font-semibold py-1.5">Supplier</th><th className="text-right font-semibold">Claims</th><th className="text-right font-semibold">Share</th>
+        <th className="text-right font-semibold">Cost</th><th className="text-right font-semibold">NFF</th><th className="text-right font-semibold">Recovered</th>
+      </tr></thead>
+      <tbody>
+        {rows.map((r) => (
+          <tr key={r.key} className="border-b border-slate-50">
+            <td className="py-1.5 text-slate-700">{r.key}</td>
+            <td className="text-right tabular-nums">{r.claims}</td>
+            <td className="text-right tabular-nums">
+              <span className="inline-flex items-center gap-1.5 justify-end">
+                <span className="w-12 h-1.5 bg-slate-100 rounded-full overflow-hidden inline-block">
+                  <span className="block h-full bg-blue-500" style={{ width: `${total ? (Number(r.claims) / total) * 100 : 0}%` }} />
+                </span>
+                {formatPct(total ? Number(r.claims) / total : null, 0)}
+              </span>
+            </td>
+            <td className="text-right tabular-nums">{formatINR(r.cost_inr)}</td>
+            <td className="text-right tabular-nums">{formatPct(r.nff_rate, 0)}</td>
+            <td className="text-right tabular-nums text-emerald-700">{formatINR(r.recovered_inr)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
