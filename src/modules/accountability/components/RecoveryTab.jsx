@@ -20,7 +20,7 @@ export default function RecoveryTab({ filters, fkey, local, actions }) {
   const d = sum.data;
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
         <KpiCard label="Recovery rate" value={d ? formatPct(Number(d.waterfall.agreed_inr) / Math.max(1, Number(d.waterfall.paid_inr))) : '…'}
           sub="agreed ÷ supplier-liable paid" info="Recovered ÷ supplier-liable paid cost (C&R K15)." />
         <KpiCard label="Agreed recovery" value={d ? formatINR(d.waterfall.agreed_inr) : '…'} sub={d ? `NFF ${formatINR(d.waterfall.nff_agreed_inr)}` : ''}
@@ -28,7 +28,6 @@ export default function RecoveryTab({ filters, fkey, local, actions }) {
         <KpiCard label="Shortfall" value={d ? formatINR(d.waterfall.shortfall_inr) : '…'} sub="paid − agreed" />
         <KpiCard label="Cash recovered" value={d ? formatINR(d.waterfall.cash_recovered_inr) : '…'} sub="demo lifecycle" info="Agreed amounts in cases at stage Recovered at the as-of date (2026-09-24)." />
         <KpiCard label="Outstanding" value={d ? formatINR(d.waterfall.outstanding_inr) : '…'} sub="agreed, not yet paid · demo" />
-        <KpiCard label="Median days to recover" value={d?.median_days_to_recover ? `${Math.round(d.median_days_to_recover)} d` : '—'} sub="notified → paid · demo" />
         <KpiCard label="Dispute rate" value={d ? formatPct(d.dispute_rate, 0) : '…'} sub="cases · demo"
           info="Share of cases (excluding future-dated) where agreed ÷ claimed fell more than 5 pts below the agreed recovery %." />
       </div>
@@ -67,12 +66,12 @@ export default function RecoveryTab({ filters, fkey, local, actions }) {
       </div>
 
       {/* Outstanding aging is hidden */}
-      <Card title="Recovery by adjudication month" subtitle="Supplier-liable paid · agreed · cash received · recovery rate">
+      <Card title="Recovery by adjudication month" subtitle="Supplier-liable paid · agreed · recovery rate">
         <DataState state={{ ...sum, data: sum.data?.by_month }} height="h-56">
           {(rows) => (
             <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={rows.map((r) => ({ ...r, paid_inr: Number(r.paid_inr), agreed_inr: Number(r.agreed_inr), cash_inr: Number(r.cash_inr), recovery_rate: Number(r.recovery_rate) }))}
+                <ComposedChart data={rows.map((r) => ({ ...r, paid_inr: Number(r.paid_inr), agreed_inr: Number(r.agreed_inr), recovery_rate: Number(r.recovery_rate) }))}
                   margin={{ top: 4, right: 4, left: -8, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                   <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#64748b' }} />
@@ -82,7 +81,6 @@ export default function RecoveryTab({ filters, fkey, local, actions }) {
                   <Legend wrapperStyle={{ fontSize: 11 }} />
                   <Bar yAxisId="inr" dataKey="paid_inr" name="Paid" fill="#c7d2fe" />
                   <Bar yAxisId="inr" dataKey="agreed_inr" name="Agreed" fill="#10b981" />
-                  <Bar yAxisId="inr" dataKey="cash_inr" name="Cash (demo)" fill="#047857" />
                   <Line yAxisId="pct" dataKey="recovery_rate" name="Recovery rate" stroke="#334155" strokeWidth={2} dot={false} />
                 </ComposedChart>
               </ResponsiveContainer>

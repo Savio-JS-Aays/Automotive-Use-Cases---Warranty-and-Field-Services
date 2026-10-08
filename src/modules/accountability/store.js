@@ -67,7 +67,8 @@ export function regionBasisFor(state) {
 }
 
 // --- URL persistence: ?acc=<json> so a view can be shared (and the old routes can deep-link a tab)
-const URL_KEYS = ['tab', 'regionBasis', 'chips', 'period', 'peer', 'minClaims', 'funnelMetric', 'heatMeasure',
+// regionBasis (auto) and period (12m) are not persisted: their controls were removed, so they stay at the defaults
+const URL_KEYS = ['tab', 'chips', 'peer', 'minClaims', 'funnelMetric', 'heatMeasure',
   'auditRule', 'openOnly', 'auditSort', 'h2hPart', 'caseStage'];
 
 export function readStateFromUrl(search) {

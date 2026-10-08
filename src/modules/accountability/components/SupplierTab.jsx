@@ -1,17 +1,16 @@
 import React from 'react';
-import { ResponsiveContainer, ScatterChart, Scatter, ComposedChart, Bar, XAxis, YAxis, ZAxis, CartesianGrid, Tooltip, ReferenceLine, Cell } from 'recharts';
+import { ResponsiveContainer, ComposedChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, Cell } from 'recharts';
 import { fetchSupplierScorecard, fetchMatrix, fetchHeadToHead, fetchSignalDetail, fetchBreakdown } from '../api';
 import { useAsync, tooltipStyle } from '../../../lib/analytics';
 import { Card, DataState, Segmented, Heatmap } from '../../../components/analytics/ui';
 import { formatINR, formatKm, formatPct } from '../../../lib/format';
-import { SUPPLIER_BAND_STYLES, supplierBand, toCsv, downloadCsv, signed } from '../lib';
-import { CsvButton, Pill, Table } from './common';
+import { supplierBand, toCsv, downloadCsv, signed } from '../lib';
+import { CsvButton, Table } from './common';
 
 // Design: docs/modules/dealer-supplier-accountability/design.md §9. No PPM: there is no fitted-volume denominator.
 
-const BAND_COLORS = { Escalate: '#e11d48', Watch: '#f59e0b', OK: '#10b981', 'Not ranked': '#cbd5e1' };
 
-export default function SupplierTab({ scoreFilters, filters, fkey, local, lookups, actions, periodLabel }) {
+export default function SupplierTab({ scoreFilters, local, lookups, actions }) {
   const card = useAsync(() => fetchSupplierScorecard(scoreFilters), `sup|${JSON.stringify(scoreFilters)}`);
   const config = lookups?.config;
   const minClaims = local.minClaims ?? config?.minClaims ?? 10;
@@ -20,17 +19,13 @@ export default function SupplierTab({ scoreFilters, filters, fkey, local, lookup
   return (
     <div className="space-y-4">
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 px-4 py-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs">
-        <span className="text-slate-500">Scorecard period: <b className="text-slate-700">{periodLabel}</b> · region basis: vehicle</span>
         <span className="flex items-center gap-2"><span className="text-slate-500 font-medium">Min claims to rank</span>
           <Segmented value={minClaims} onChange={local.setMinClaims} options={[5, 10, 20].map((n) => ({ value: n, label: String(n) }))} />
         </span>
         <span className="ml-auto text-slate-400">No PPM: dim_part lists one supplier for every part, so there is no fitted-volume denominator. Indices compare suppliers on the same parts.</span>
       </div>
       <Scorecard state={card} rows={rows} actions={actions} />
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <QualityRecovery state={card} rows={rows} config={config} actions={actions} />
-        <SupplierPartMatrix filters={scoreFilters} local={local} lookups={lookups} actions={actions} />
-      </div>
+      <SupplierPartMatrix filters={scoreFilters} local={local} lookups={lookups} actions={actions} />
       {/* Same part, different suppliers and supplier evidence are hidden */}
     </div>
   );
@@ -46,7 +41,6 @@ function Scorecard({ state, rows, actions }) {
     { key: 'claims', label: 'Claims', align: 'right' },
     { key: 'liable_cost_inr', label: 'Liable ₹', align: 'right', render: (r) => formatINR(r.liable_cost_inr) },
     { key: 'cost_index', label: 'Cost ×', align: 'right', render: (r) => Number(r.cost_index).toFixed(2) },
-    { key: 'early_failure_score', label: 'Early', align: 'right', render: (r) => (r.early_failure_score === null ? '—' : Number(r.early_failure_score).toFixed(2)) },
     { key: 'nff_rate', label: 'NFF', align: 'right', render: (r) => formatPct(r.nff_rate, 0) },
     { key: 'recovery_rate', label: 'Recov.', align: 'right', render: (r) => formatPct(r.recovery_rate, 0) },
     { key: 'agreed_pct', label: 'Agreed', align: 'right', render: (r) => formatPct(r.agreed_pct, 0) },
@@ -54,19 +48,18 @@ function Scorecard({ state, rows, actions }) {
     { key: 'shortfall_inr', label: 'Shortfall', align: 'right', render: (r) => formatINR(r.shortfall_inr) },
     { key: 'missed_recovery_inr', label: 'Missed', align: 'right', render: (r) => formatINR(r.missed_recovery_inr) },
     { key: 'open_cases', label: 'Open cases', align: 'right' },
-    { key: 'uiBand', label: 'Band', render: (r) => <Pill text={r.uiBand} styles={SUPPLIER_BAND_STYLES} /> },
   ];
   const exportCsv = () => downloadCsv(toCsv(rows, [
     { key: 'supplier_id', label: 'Supplier ID' }, { key: 'supplier_name', label: 'Supplier' }, { key: 'stated_risk_tier', label: 'Stated tier' },
     { key: 'observed_tier', label: 'Observed tier' }, { key: 'claims', label: 'Claims' }, { key: 'liable_claims', label: 'Liable claims' },
-    { key: 'liable_cost_inr', label: 'Liable INR' }, { key: 'cost_index', label: 'Cost index' }, { key: 'early_failure_score', label: 'Early-failure score' },
+    { key: 'liable_cost_inr', label: 'Liable INR' }, { key: 'cost_index', label: 'Cost index' },
     { key: 'nff_rate', label: 'NFF rate' }, { key: 'median_km', label: 'Median km' }, { key: 'recovery_rate', label: 'Recovery rate' },
     { key: 'agreed_pct', label: 'Agreed %' }, { key: 'compliance_gap', label: 'Compliance gap' }, { key: 'shortfall_inr', label: 'Shortfall INR' },
-    { key: 'missed_recovery_inr', label: 'Missed recovery INR' }, { key: 'open_cases', label: 'Open cases' }, { key: 'uiBand', label: 'Band' },
+    { key: 'missed_recovery_inr', label: 'Missed recovery INR' }, { key: 'open_cases', label: 'Open cases' },
   ]), 'supplier-scorecard');
   return (
     <Card title="Supplier scorecard" subtitle="Failures-only, mix-adjusted quality · recovery vs agreement"
-      info="Cost × = cost ÷ network average cost of the same parts. Early = 1 ÷ median(km at failure ÷ network median km of the same part): above 1 means this supplier's parts fail earlier. Band: Escalate if either index ≥ 1.25; Watch if ≥ 1.10 or recovery more than 5 pts below the agreed % (wty_config). Observed tier uses quality only. Agreement terms are a demo seed."
+      info="Cost × = cost ÷ network average cost of the same parts. Ranked over the last 12 months up to the as-of date. Observed tier uses quality only. Gap = recovery rate minus the agreed recovery %. Agreement terms are a demo seed."
       actions={<CsvButton onClick={exportCsv} disabled={!rows.length} />}>
       <DataState state={state}>
         {() => <Table rows={rows} cols={cols} rowKey={(r) => r.supplier_id} onRow={(r) => actions.openSupplier(r.supplier_id)} rowClass={(r) => (r.uiBand === 'Not ranked' ? 'text-slate-400' : '')} />}
@@ -75,45 +68,6 @@ function Scorecard({ state, rows, actions }) {
   );
 }
 
-// Q2
-function QualityRecovery({ state, rows, config, actions }) {
-  const pts = rows.filter((r) => r.recovery_rate !== null).map((r) => ({
-    ...r, x: Math.max(Number(r.cost_index), Number(r.early_failure_score ?? 0)), y: Number(r.recovery_rate), z: Number(r.liable_cost_inr),
-  }));
-  const meanAgreed = rows.length ? rows.reduce((s, r) => s + Number(r.agreed_pct || 0), 0) / rows.length : 0.75;
-  return (
-    <Card title="Quality × recovery" subtitle="x = worst quality index · y = recovery rate · size = liable cost"
-      info="Right of the dashed line = fails more than peers on the same parts (Watch threshold). Below the dashed line = recovers less than the average agreed %. Bottom-right suppliers fail more and pay less: escalate.">
-      <DataState state={state}>
-        {() => (
-          <div className="h-80 relative">
-            <span className="absolute right-3 bottom-8 text-[10px] font-semibold text-rose-500">Fails more & pays less</span>
-            <span className="absolute right-3 top-1 text-[10px] text-slate-400">Fails more, pays</span>
-            <span className="absolute left-12 bottom-8 text-[10px] text-slate-400">Reliable, slow to pay</span>
-            <ResponsiveContainer width="100%" height="100%">
-              <ScatterChart margin={{ top: 12, right: 12, left: -8, bottom: 4 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis type="number" dataKey="x" name="Quality index" domain={['auto', 'auto']} tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={(v) => v.toFixed(2)} />
-                <YAxis type="number" dataKey="y" name="Recovery rate" domain={['auto', 'auto']} tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={(v) => `${Math.round(v * 100)}%`} />
-                <ZAxis type="number" dataKey="z" range={[40, 400]} />
-                {config && <ReferenceLine x={config.supIndexWatch} stroke="#f59e0b" strokeDasharray="4 4" />}
-                <ReferenceLine y={meanAgreed} stroke="#94a3b8" strokeDasharray="4 4" />
-                <Tooltip {...tooltipStyle} content={({ payload }) => {
-                  const d = payload?.[0]?.payload;
-                  if (!d) return null;
-                  return <div className="bg-white border border-slate-200 rounded-lg shadow p-2 text-xs"><p className="font-semibold">{d.supplier_name}</p><p>Index {d.x.toFixed(2)} · recovery {formatPct(d.y)} · liable {formatINR(d.z)}</p></div>;
-                }} />
-                <Scatter data={pts} onClick={(d) => actions.openSupplier(d.supplier_id)} cursor="pointer">
-                  {pts.map((p) => <Cell key={p.supplier_id} fill={BAND_COLORS[p.uiBand]} fillOpacity={0.75} />)}
-                </Scatter>
-              </ScatterChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-      </DataState>
-    </Card>
-  );
-}
 
 // Q3 (reuses the Claims & Repair matrix)
 const MEASURES = { claims: 'Claims', cost_inr: 'Cost', nff_rate: 'NFF %' };

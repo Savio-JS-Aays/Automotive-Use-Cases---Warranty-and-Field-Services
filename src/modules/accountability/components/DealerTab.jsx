@@ -4,8 +4,8 @@ import { fetchDealerScorecard, fetchMatrix } from '../api';
 import { useAsync, tooltipStyle } from '../../../lib/analytics';
 import { Card, DataState, Segmented, Heatmap } from '../../../components/analytics/ui';
 import { formatINR, formatPct } from '../../../lib/format';
-import { DEALER_BAND_STYLES, FACTORS, dealerBand, funnelLimits, toCsv, downloadCsv, signed } from '../lib';
-import { ContributionBar, CsvButton, Pill, Sparkline, Table } from './common';
+import { FACTORS, dealerBand, factorContributions, funnelLimits, toCsv, downloadCsv, signed } from '../lib';
+import { CsvButton, Table } from './common';
 
 // Design: docs/modules/dealer-supplier-accountability/design.md §7
 
@@ -18,7 +18,7 @@ const FUNNEL_METRICS = {
   high_risk_rate: 'AI-high %',
 };
 
-export default function DealerTab({ scoreFilters, local, lookups, actions, periodLabel }) {
+export default function DealerTab({ scoreFilters, local, lookups, actions }) {
   const skey = `${JSON.stringify(scoreFilters)}|${local.peer}`;
   const card = useAsync(() => fetchDealerScorecard(scoreFilters, local.peer), skey);
   const config = lookups?.config;
@@ -31,7 +31,6 @@ export default function DealerTab({ scoreFilters, local, lookups, actions, perio
   return (
     <div className="space-y-4">
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 px-4 py-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs">
-        <span className="text-slate-500">Scorecard period: <b className="text-slate-700">{periodLabel}</b></span>
         <span className="flex items-center gap-2"><span className="text-slate-500 font-medium">Peer group</span>
           <Segmented value={local.peer} onChange={local.setPeer} options={[{ value: 'network', label: 'Network' }, { value: 'tier', label: 'Same tier' }, { value: 'region', label: 'Same region' }]} />
         </span>
@@ -41,8 +40,8 @@ export default function DealerTab({ scoreFilters, local, lookups, actions, perio
         {!card.loading && config && (
           <span className={`ml-auto ${flagged ? 'text-rose-700' : 'text-slate-500'}`}>
             {flagged
-              ? `${flagged} of ${ranked.length} ranked dealers reach Medium or High.`
-              : `No dealer is a statistical outlier in this period: index max ${maxIdx.toFixed(2)}, Medium starts at ${config.bandMedium}.`}
+              ? `${flagged} of ${ranked.length} ranked dealers score 75 or below (watch or audit).`
+              : `No dealer is a statistical outlier in this period: lowest score ${Math.round(100 * (1 - Math.min(maxIdx, 4) / 4))}, watch starts at 75.`}
           </span>
         )}
       </div>
@@ -56,9 +55,35 @@ export default function DealerTab({ scoreFilters, local, lookups, actions, perio
 }
 
 // D1
-function Scorecard({ state, rows, config, actions }) {
-  const [sort, setSort] = useState({ key: 'risk_index', desc: true });
+// Dealer score 0-100 (higher = better) from the Dealer Risk Index: 100 × (1 − index ÷ 4). The index is capped at 4
+// (weights sum to 1, each factor z is clamped to 4), so Medium (index ≥ 1) is a score ≤ 75 and High (≥ 2) ≤ 50.
+const INDEX_MAX = 4;
+const dealerScore = (r) => (r.uiBand === 'Not ranked' ? null : Math.round(100 * (1 - Math.min(Math.max(Number(r.risk_index) || 0, 0), INDEX_MAX) / INDEX_MAX)));
+const scoreTone = (s) => (s === null ? '#cbd5e1' : s <= 50 ? '#e11d48' : s <= 75 ? '#f59e0b' : '#10b981');
+
+function ScoreCell({ row, config }) {
+  const score = row.score;
+  if (score === null) return <span className="text-slate-400">not ranked</span>;
+  const parts = config ? factorContributions(row, config).filter((f) => f.value > 0.005) : [];
+  const why = parts.length
+    ? `Pulled down by: ${parts.sort((a, b) => b.value - a.value).map((f) => f.label.toLowerCase()).join(', ')}`
+    : 'No factor is worse than the peer group';
+  return (
+    <span className="inline-flex items-center gap-2" title={`Score ${score} / 100. ${why}.`}>
+      <span className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden inline-block">
+        <span className="block h-full rounded-full" style={{ width: `${score}%`, backgroundColor: scoreTone(score) }} />
+      </span>
+      <span className="font-semibold tabular-nums w-6 text-right" style={{ color: scoreTone(score) }}>{score}</span>
+    </span>
+  );
+}
+
+function Scorecard({ state, rows: rawRows, config, actions }) {
+  const [sort, setSort] = useState({ key: 'score', desc: false });
   const [q, setQ] = useState('');
+  const [costMode, setCostMode] = useState('index');
+  const [laborMode, setLaborMode] = useState('index');
+  const rows = rawRows.map((r) => ({ ...r, score: dealerScore(r) }));
   const shown = rows
     .filter((r) => !q || r.dealer_name.toLowerCase().includes(q.toLowerCase()))
     .sort((a, b) => {
@@ -68,41 +93,56 @@ function Scorecard({ state, rows, config, actions }) {
       const y = Number(b[sort.key] ?? -1e9);
       return sort.desc ? y - x : x - y;
     });
-  const head = (key, label) => (
-    <button type="button" onClick={() => setSort((s) => ({ key, desc: s.key === key ? !s.desc : true }))} className={`uppercase ${sort.key === key ? 'text-sky-700' : ''}`}>
+  const sortBtn = (key, label) => (
+    <button type="button" onClick={() => setSort((s) => ({ key, desc: s.key === key ? !s.desc : true }))} className={`uppercase ${sort.key === key ? 'text-blue-700' : ''}`}>
       {label}{sort.key === key ? (sort.desc ? ' ↓' : ' ↑') : ''}
     </button>
   );
-  const scale = Math.max(1, ...rows.map((r) => Number(r.risk_index)));
+  // Header with a sort button plus a small × / ₹ switch; the sort follows the switch
+  const switchHead = (mode, setMode, keys, labels) => {
+    const key = mode === 'index' ? keys[0] : keys[1];
+    const flip = (m) => {
+      setMode(m);
+      setSort((s) => (keys.includes(s.key) ? { ...s, key: m === 'index' ? keys[0] : keys[1] } : s));
+    };
+    return (
+      <span className="inline-flex items-center gap-1.5 justify-end">
+        {sortBtn(key, mode === 'index' ? labels[0] : labels[1])}
+        <span className="inline-flex rounded border border-slate-200 overflow-hidden normal-case">
+          {[['index', '×'], ['inr', '₹']].map(([m, t]) => (
+            <button key={m} type="button" onClick={() => flip(m)} title={m === 'index' ? labels[2] : labels[3]}
+              className={`px-1.5 py-px text-[10px] font-semibold ${mode === m ? 'bg-blue-600 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}>{t}</button>
+          ))}
+        </span>
+      </span>
+    );
+  };
   const cols = [
     { key: 'dealer_name', label: 'Dealer', render: (r) => (
       <span className="font-medium text-slate-800">{r.dealer_name}{r.dealer_status === 'Suspended' && <span className="ml-1.5 text-[10px] font-bold text-rose-600" title="dim_dealer.status = Suspended">SUSPENDED</span>}</span>
     ) },
-    { key: 'dealer_tier', label: 'Tier' },
     { key: 'dealer_region', label: 'Region' },
-    { key: 'claims', label: head('claims', 'Claims'), align: 'right' },
-    { key: 'cost_index', label: head('cost_index', 'Cost ×'), align: 'right', render: (r) => Number(r.cost_index).toFixed(2) },
-    { key: 'labor_index', label: head('labor_index', 'Labor ×'), align: 'right', render: (r) => (r.labor_index === null ? '—' : Number(r.labor_index).toFixed(2)) },
-    { key: 'overrun_rate', label: head('overrun_rate', 'Ovr'), align: 'right', render: (r) => formatPct(r.overrun_rate, 0) },
-    { key: 'nff_rate', label: head('nff_rate', 'NFF'), align: 'right', render: (r) => formatPct(r.nff_rate, 0) },
-    { key: 'reject_rate', label: head('reject_rate', 'Rej'), align: 'right', render: (r) => formatPct(r.reject_rate, 0) },
-    { key: 'high_risk_rate', label: head('high_risk_rate', 'AI-hi'), align: 'right', render: (r) => formatPct(r.high_risk_rate, 0) },
-    { key: 'avoidable_inr', label: head('avoidable_inr', 'Avoidable'), align: 'right', render: (r) => formatINR(r.avoidable_inr) },
-    { key: 'risk_index', label: head('risk_index', 'Risk index'), render: (r) => (config ? <ContributionBar row={r} config={config} scale={scale} /> : r.risk_index) },
-    { key: 'uiBand', label: 'Band', render: (r) => <Pill text={r.uiBand} styles={DEALER_BAND_STYLES} /> },
-    { key: 'trend', label: '6-mo claims', render: (r) => <Sparkline points={r.trend} /> },
+    { key: 'claims', label: sortBtn('claims', 'Claims'), align: 'right' },
+    { key: 'cost', align: 'right',
+      label: switchHead(costMode, setCostMode, ['cost_index', 'cost_inr'], ['Cost ×', 'Cost', 'Cost index: actual ÷ network cost of the same parts (1.00 = average)', 'Total claim cost in ₹']),
+      render: (r) => (costMode === 'index' ? Number(r.cost_index).toFixed(2) : formatINR(r.cost_inr)) },
+    { key: 'labor', align: 'right',
+      label: switchHead(laborMode, setLaborMode, ['labor_index', 'excess_labor_inr'], ['Labor ×', 'Labor', 'Labor index: billed ÷ SRT benchmark hours (1.00 = on benchmark)', 'Excess labor in ₹: hours billed above the SRT maximum × ₹1,500']),
+      render: (r) => (laborMode === 'index' ? (r.labor_index === null ? '—' : Number(r.labor_index).toFixed(2)) : formatINR(r.excess_labor_inr)) },
+    { key: 'overrun_rate', label: sortBtn('overrun_rate', 'Ovr'), align: 'right', render: (r) => formatPct(r.overrun_rate, 0) },
+    { key: 'nff_rate', label: sortBtn('nff_rate', 'NFF'), align: 'right', render: (r) => formatPct(r.nff_rate, 0) },
+    { key: 'score', label: sortBtn('score', 'Score'), render: (r) => <ScoreCell row={r} config={config} /> },
   ];
   const exportCsv = () => downloadCsv(toCsv(shown, [
     { key: 'dealer_id', label: 'Dealer ID' }, { key: 'dealer_name', label: 'Dealer' }, { key: 'dealer_tier', label: 'Tier' },
     { key: 'dealer_region', label: 'Region' }, { key: 'dealer_status', label: 'Status' }, { key: 'claims', label: 'Claims' },
     { key: 'cost_inr', label: 'Cost INR' }, { key: 'cost_index', label: 'Cost index' }, { key: 'labor_index', label: 'Labor index' },
-    { key: 'overrun_rate', label: 'Overrun rate' }, { key: 'nff_rate', label: 'NFF rate' }, { key: 'reject_rate', label: 'Rejection rate' },
-    { key: 'high_risk_rate', label: 'AI-high rate' }, { key: 'avoidable_inr', label: 'Avoidable INR' },
-    ...FACTORS.map((f) => ({ key: f.key, label: `${f.label} z` })), { key: 'risk_index', label: 'Risk index' }, { key: 'uiBand', label: 'Band' },
+    { key: 'excess_labor_inr', label: 'Excess labor INR' }, { key: 'overrun_rate', label: 'Overrun rate' }, { key: 'nff_rate', label: 'NFF rate' },
+    { key: 'score', label: 'Score (0-100)' },
   ]), 'dealer-scorecard');
   return (
-    <Card title="Dealer scorecard" subtitle="Mix-adjusted cost and labor, quality rates, and the Dealer Risk Index"
-      info="Cost × = actual cost ÷ network average cost of the same parts. Labor × = billed ÷ SRT benchmark hours. Risk index = n/(n+30) × Σ weight × clamp(z, 0, 4) over cost, labor, NFF, rejection and AI-high (weights in wty_config). Only the bad direction counts. Hover the bar for each factor's z. Click a row for the Dealer 360."
+    <Card title="Dealer scorecard" subtitle="Mix-adjusted cost and labor, quality rates and an overall score (100 = best) · use × / ₹ in the column headers to switch between index and amount"
+      info="Cost × = actual cost ÷ network average cost of the same parts; ₹ = total claim cost. Labor × = billed ÷ SRT benchmark hours; ₹ = labor billed above the SRT maximum × ₹1,500/h. Score = 100 × (1 − Dealer Risk Index ÷ 4): the risk index combines cost, labor, NFF, rejection and AI-high rates against the peer group, shrunk for small dealers. 75 or below = watch (Medium), 50 or below = audit (High). Hover a score to see what pulls it down. Ranked over the last 12 months up to the as-of date. Click a row for the Dealer 360."
       actions={(
         <>
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search dealer…" className="border border-slate-200 rounded-md px-2 py-1 text-xs w-40" />

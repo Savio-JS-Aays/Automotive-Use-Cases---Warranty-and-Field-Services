@@ -50,7 +50,8 @@ export const useReliabilityStore = create((set) => ({
 }));
 
 // --- URL persistence: ?rel=<json> so a view can be shared (and /ews, /predictive-calibration can deep-link a tab)
-const URL_KEYS = ['tab', 'regionBasis', 'chips', 'groupBy', 'grain', 'basis', 'compare', 'horizon', 'minBand', 'beforeExpiryOnly'];
+// regionBasis is not persisted: its control was removed, so it always stays at the default (vehicle)
+const URL_KEYS = ['tab', 'chips', 'groupBy', 'grain', 'basis', 'compare', 'horizon', 'minBand', 'beforeExpiryOnly'];
 
 export function readStateFromUrl(search) {
   try {

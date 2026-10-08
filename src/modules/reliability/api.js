@@ -39,6 +39,12 @@ export const fetchSignalSeries = (f, grain) => rpc('wty_rel_signal_series', { p_
 export const fetchSignalDetail = (f) => rpc('wty_rel_signal_detail', { p_filters: f });
 export const fetchWeibull = (partId, basis, grpType) => rpc('wty_rel_weibull', { p_part_id: partId, p_basis: basis, p_grp_type: grpType });
 export const fetchCalibration = (f, horizon) => rpc('wty_rel_calibration', { p_filters: f, p_horizon_months: horizon });
+// Model / variant / vehicle-type combinations for the coverage simulator's own filters
+export async function fetchModelOptions() {
+  const { data, error } = await supabase.from('dim_v_model').select('model_name, variant, vehicle_type');
+  if (error) throw error;
+  return data || [];
+}
 export const fetchForecast = (f, horizon) => rpc('wty_rel_forecast', { p_filters: f, p_horizon_months: horizon });
 export const fetchModelPerformance = (f, days = 30) => rpc('wty_rel_model_performance', { p_filters: f, p_horizon_days: days });
 export const fetchAtRiskPage = (f, { minBand = 'Medium', beforeExpiryOnly = false, limit = 25, offset = 0 } = {}) =>

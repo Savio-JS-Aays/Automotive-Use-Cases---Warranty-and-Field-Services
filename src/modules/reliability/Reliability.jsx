@@ -5,7 +5,7 @@ import { useFilterStore } from '../../store/useFilterStore';
 import { useReliabilityStore, readStateFromUrl, writeStateToUrl, claimsAnalyticsHref, CHIP_LABELS } from './store';
 import { buildFilters, fetchLookups, fetchWeibull, BackendMissingError } from './api';
 import { useAsync } from '../../lib/analytics';
-import { PageHeader, Segmented } from '../../components/analytics/ui';
+import { PageHeader } from '../../components/analytics/ui';
 import { ClaimDrawer } from '../claims-analytics/components/Drawers';
 import SignalsTab from './components/SignalsTab';
 import ReliabilityTab from './components/ReliabilityTab';
@@ -141,10 +141,6 @@ function FilterBar({ local, lookups }) {
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 px-4 py-3">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <div className="flex items-center gap-2 text-xs">
-          <span className="text-slate-500 font-medium">Region basis</span>
-          <Segmented value={local.regionBasis} onChange={local.setRegionBasis} options={[{ value: 'vehicle', label: 'Vehicle' }, { value: 'dealer', label: 'Dealer' }]} />
-        </div>
         <label className="flex items-center gap-2 text-xs">
           <span className="text-slate-500 font-medium">Part</span>
           <select value={local.chips.part_id?.[0]?.value || ''}

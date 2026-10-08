@@ -2,10 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { DatabaseZap, SlidersHorizontal, X } from 'lucide-react';
 import { useFilterStore } from '../../store/useFilterStore';
-import { useAccountabilityStore, readStateFromUrl, writeStateToUrl, claimsAnalyticsHref, regionBasisFor, CHIP_LABELS } from './store';
-import { buildFilters, scorecardFilters, fetchLookups, fetchCaseDetail, BackendMissingError, PERIOD_LABELS } from './api';
+import { useAccountabilityStore, readStateFromUrl, writeStateToUrl, claimsAnalyticsHref, CHIP_LABELS } from './store';
+import { buildFilters, scorecardFilters, fetchLookups, fetchCaseDetail, BackendMissingError } from './api';
 import { useAsync } from '../../lib/analytics';
-import { PageHeader, Segmented } from '../../components/analytics/ui';
+import { PageHeader } from '../../components/analytics/ui';
 import { ClaimDrawer } from '../claims-analytics/components/Drawers';
 import SummaryTab from './components/SummaryTab';
 import DealerTab from './components/DealerTab';
@@ -88,8 +88,7 @@ export default function Accountability() {
       </div>
 
       <TabBoundary>
-        <ActiveTab filters={filters} fkey={fkey} scoreFilters={scoreFilters} local={local} lookups={lookups} actions={actions}
-          periodLabel={PERIOD_LABELS[period]} />
+        <ActiveTab filters={filters} fkey={fkey} scoreFilters={scoreFilters} local={local} lookups={lookups} actions={actions} />
       </TabBoundary>
 
       {drawer?.kind === 'dealer' && (
@@ -164,19 +163,9 @@ function FilterBar({ local, lookups }) {
     { key: 'subsystem', label: 'Subsystem', options: (lookups?.subsystems || []).map((v) => ({ value: v, label: v })) },
     { key: 'supplier_id', label: 'Supplier', options: (lookups?.suppliers || []).map((s) => ({ value: s.supplier_id, label: s.supplier_name })) },
   ];
-  const effectiveBasis = regionBasisFor(local);
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 px-4 py-3">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <div className="flex items-center gap-2 text-xs">
-          <span className="text-slate-500 font-medium">Region basis</span>
-          <Segmented value={local.regionBasis} onChange={local.setRegionBasis}
-            options={[{ value: 'auto', label: `Auto (${effectiveBasis})` }, { value: 'dealer', label: 'Dealer' }, { value: 'vehicle', label: 'Vehicle' }]} />
-        </div>
-        <div className="flex items-center gap-2 text-xs">
-          <span className="text-slate-500 font-medium">Scorecard period</span>
-          <Segmented value={local.period} onChange={local.setPeriod} options={Object.entries(PERIOD_LABELS).map(([value, label]) => ({ value, label }))} />
-        </div>
         <label className="flex items-center gap-2 text-xs">
           <span className="text-slate-500 font-medium">Dealer</span>
           <select value={local.chips.dealer_id?.[0]?.value || ''}
