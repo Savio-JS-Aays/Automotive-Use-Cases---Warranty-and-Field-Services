@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import {
-  ResponsiveContainer, ComposedChart, BarChart, Bar, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceLine,
+  ResponsiveContainer, ComposedChart, Bar, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceArea,
 } from 'recharts';
 import { format } from 'date-fns';
-import { fetchForecast, fetchCalibration, fetchModelPerformance, fetchAtRiskPage, fetchModelOptions } from '../api';
-import { useAsync, tooltipStyle, num } from '../../../lib/analytics';
+import { fetchForecast, fetchCalibration, fetchAtRiskPage, fetchModelOptions } from '../api';
+import { useAsync, num } from '../../../lib/analytics';
 import { Card, DataState, InfoTooltip, KpiCard, Segmented } from '../../../components/analytics/ui';
 import { formatINR, formatKm, formatNumber, formatPct } from '../../../lib/format';
 import { weibullF, RECOMMENDATION_STYLES, WARRANTY_MONTHS, WARRANTY_KM } from '../lib';
@@ -18,7 +18,6 @@ export default function ForecastTab({ filters, fkey, local, actions }) {
   const horizon = local.horizon;
   const forecast = useAsync(() => fetchForecast(filters, horizon), `${fkey}|${horizon}`);
   const calibration = useAsync(() => fetchCalibration(filters, horizon), `${fkey}|${horizon}`);
-  const perf = useAsync(() => fetchModelPerformance(filters, 30), fkey);
   const risk = useAsync(() => fetchAtRiskPage(filters, { minBand: local.minBand, beforeExpiryOnly: local.beforeExpiryOnly, limit: 500 }),
     `${fkey}|${local.minBand}|${local.beforeExpiryOnly}`);
 
@@ -40,8 +39,8 @@ export default function ForecastTab({ filters, fkey, local, actions }) {
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         {/* P1 */}
         <Card className="xl:col-span-2" title="Actual vs forecast in-warranty claims"
-          subtitle="Bars: actual claims (inside / outside base coverage) · lines: model and calibrated expectation · band: 95% Poisson"
-          info="Model = expected first failures inside each vehicle's warranty window, from the fitted Weibull per part and the fleet's age. The raw model under-predicts because seed claims only start in 2025, so it is calibrated with a factor: actual ÷ model over the last 11 complete months. Both lines are shown so the correction stays visible."
+          subtitle="Monthly claims against the calibrated model expectation, with the forecast ahead"
+          info="Model = expected first failures inside each vehicle's warranty window, from the fitted Weibull per part and the fleet's age. It is calibrated with a factor (actual ÷ model over the last 11 complete months) because seed claims only start in 2025; the factor is shown in the KPI above. Line: calibrated expectation (solid over history, dashed over the forecast). Shaded band: 95% Poisson range."
           tag="model">
           <DataState state={forecast}>
             {(rows) => <ForecastChart rows={rows} factor={factor} />}
@@ -64,34 +63,23 @@ export default function ForecastTab({ filters, fkey, local, actions }) {
         </DataState>
       </Card>
 
-      <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
-        {/* P4 */}
-        <Card className="xl:col-span-2" title="Health-model performance" subtitle="fact_vehicle_health predictions vs replacements within 30 days (9 modelled parts)"
-          info="Hit rate: share of weekly predictions in a risk band followed by a replacement of that part within 30 days (only predictions whose 30 days are observed). Recall: share of replacements that had a High/Critical flag in the 30 days before. Lead: days from the first flag to the replacement."
-          actions={<ConnectedTag />}>
-          <DataState state={perf} height="h-64">
-            {(d) => <ModelPerformance d={d} />}
-          </DataState>
-        </Card>
-
-        {/* P5 */}
-        <Card className="xl:col-span-3" title="At-risk vehicles" subtitle="Latest health prediction per vehicle and part, with remaining warranty"
-          info="From fact_vehicle_health (latest prediction up to the as-of date) and wty_vehicle_coverage. “Fails before expiry” = remaining useful life (days, and km where the odometer is known) is shorter than the remaining warranty."
-          actions={(
-            <>
-              <Segmented size="xs" value={local.minBand} onChange={local.setMinBand} options={['Medium', 'High', 'Critical'].map((v) => ({ value: v, label: `${v}+` }))} />
-              <label className="flex items-center gap-1 text-[11px] text-slate-600 cursor-pointer">
-                <input type="checkbox" className="accent-sky-600" checked={local.beforeExpiryOnly} onChange={(e) => local.setBeforeExpiryOnly(e.target.checked)} />
-                Fails before expiry
-              </label>
-              <ConnectedTag />
-            </>
-          )}>
-          <DataState state={risk} height="h-64" empty="No vehicles at this risk level.">
-            {(rows) => <AtRiskTable rows={rows} />}
-          </DataState>
-        </Card>
-      </div>
+      {/* P5 */}
+      <Card title="At-risk vehicles" subtitle="Latest health prediction per vehicle and part, with remaining warranty"
+        info="From fact_vehicle_health (latest prediction up to the as-of date) and wty_vehicle_coverage. “Fails before expiry” = remaining useful life (days, and km where the odometer is known) is shorter than the remaining warranty."
+        actions={(
+          <>
+            <Segmented size="xs" value={local.minBand} onChange={local.setMinBand} options={['Medium', 'High', 'Critical'].map((v) => ({ value: v, label: `${v}+` }))} />
+            <label className="flex items-center gap-1 text-[11px] text-slate-600 cursor-pointer">
+              <input type="checkbox" className="accent-sky-600" checked={local.beforeExpiryOnly} onChange={(e) => local.setBeforeExpiryOnly(e.target.checked)} />
+              Fails before expiry
+            </label>
+            <ConnectedTag />
+          </>
+        )}>
+        <DataState state={risk} height="h-64" empty="No vehicles at this risk level.">
+          {(rows) => <AtRiskTable rows={rows} />}
+        </DataState>
+      </Card>
     </div>
   );
 }
@@ -128,37 +116,103 @@ function Kpis({ forecast, calibration, risk, factor, horizon }) {
 
 // ---------------------------------------------------------------------------
 function ForecastChart({ rows, factor }) {
+  const f = factor || 1;
   const data = rows.map((r) => {
     const actual = r.actual_claims === null ? null : num(r.actual_claims);
     const inCov = r.actual_in_coverage_claims === null ? null : num(r.actual_in_coverage_claims);
+    const calibrated = num(r.calibrated_claims);
     return {
-      ...r,
+      period: r.period,
+      isForecast: r.is_forecast,
       label: format(new Date(`${r.period}T00:00:00`), 'MMM yy'),
       inCov,
       outCov: actual === null ? null : actual - inCov,
-      model: num(r.expected_claims),
-      calibrated: num(r.calibrated_claims),
-      band: [num(r.lower_claims) * (factor || 1), num(r.upper_claims) * (factor || 1)],
+      calibrated,
+      // Solid line over history, dashed over the forecast; both carry the last actual month so they join
+      calHist: r.is_forecast ? null : calibrated,
+      calFcst: r.is_forecast ? calibrated : null,
+      band: [num(r.lower_claims) * f, num(r.upper_claims) * f],
     };
   });
-  const firstForecast = data.find((d) => d.is_forecast);
+  const firstIdx = data.findIndex((d) => d.isForecast);
+  if (firstIdx > 0) data[firstIdx - 1].calFcst = data[firstIdx - 1].calibrated;
+  const firstForecast = firstIdx >= 0 ? data[firstIdx] : null;
+  const lastLabel = data.length ? data[data.length - 1].label : null;
+
+  const legend = [
+    { label: 'Actual: in coverage', swatch: <span className="w-2.5 h-2.5 rounded-sm bg-sky-600" /> },
+    { label: 'Actual: out of coverage', swatch: <span className="w-2.5 h-2.5 rounded-sm bg-slate-300" /> },
+    { label: 'Expected (calibrated)', swatch: <span className="w-4 h-0.5 bg-indigo-500 rounded" /> },
+    { label: 'Forecast', swatch: <span className="w-4 border-t-2 border-dashed border-indigo-500" /> },
+    { label: '95% range', swatch: <span className="w-2.5 h-2.5 rounded-sm bg-indigo-100" /> },
+  ];
+
   return (
-    <div className="h-80">
-      <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={data} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-          <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={false} minTickGap={8} />
-          <YAxis tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={false} />
-          <Tooltip {...tooltipStyle} formatter={(v, n) => (Array.isArray(v) ? [`${formatNumber(v[0], 0)} – ${formatNumber(v[1], 0)}`, n] : [formatNumber(v, 1), n])} />
-          <Legend wrapperStyle={{ fontSize: 11 }} />
-          {firstForecast && <ReferenceLine x={firstForecast.label} stroke="#64748b" strokeDasharray="4 4" label={{ value: 'forecast →', fontSize: 10, fill: '#64748b', position: 'insideTopLeft' }} />}
-          <Area dataKey="band" name="95% band (calibrated)" fill="#e0e7ff" stroke="none" />
-          <Bar dataKey="inCov" name="Actual: in coverage" stackId="a" fill="#0284c7" />
-          <Bar dataKey="outCov" name="Actual: out of coverage" stackId="a" fill="#cbd5e1" radius={[3, 3, 0, 0]} />
-          <Line dataKey="calibrated" name="Calibrated expectation" stroke="#6366f1" strokeWidth={2} dot={false} />
-          <Line dataKey="model" name="Raw model" stroke="#6366f1" strokeDasharray="4 4" dot={false} />
-        </ComposedChart>
-      </ResponsiveContainer>
+    <div>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mb-2 text-[11px] text-slate-600">
+        {legend.map((l) => (
+          <span key={l.label} className="flex items-center gap-1.5">{l.swatch}{l.label}</span>
+        ))}
+      </div>
+      <div className="h-80">
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart data={data} margin={{ top: 16, right: 8, left: -8, bottom: 0 }} barCategoryGap="20%">
+            <defs>
+              <linearGradient id="fcBand" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#6366f1" stopOpacity={0.22} />
+                <stop offset="100%" stopColor="#6366f1" stopOpacity={0.08} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+            {firstForecast && (
+              <ReferenceArea x1={firstForecast.label} x2={lastLabel} fill="#f8fafc" fillOpacity={1} ifOverflow="extendDomain"
+                label={{ value: 'Forecast', position: 'insideTop', fontSize: 10, fill: '#64748b', fontWeight: 600 }} />
+            )}
+            <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} minTickGap={8} />
+            <YAxis tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={false} allowDecimals={false} />
+            <Tooltip content={<ForecastTooltip />} cursor={{ fill: '#f1f5f9', fillOpacity: 0.6 }} />
+            {firstForecast && <ReferenceLine x={firstForecast.label} stroke="#94a3b8" strokeDasharray="3 3" />}
+            <Area dataKey="band" fill="url(#fcBand)" stroke="none" isAnimationActive={false} activeDot={false} />
+            <Bar dataKey="inCov" stackId="a" fill="#0284c7" maxBarSize={28} />
+            <Bar dataKey="outCov" stackId="a" fill="#cbd5e1" radius={[3, 3, 0, 0]} maxBarSize={28} />
+            <Line dataKey="calHist" stroke="#6366f1" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} connectNulls={false} />
+            <Line dataKey="calFcst" stroke="#6366f1" strokeWidth={2.5} strokeDasharray="6 4" dot={false} activeDot={{ r: 4 }} connectNulls={false} />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
+function ForecastTooltip({ active, payload }) {
+  if (!active || !payload?.length) return null;
+  const d = payload[0].payload;
+  const actual = d.inCov === null ? null : d.inCov + (d.outCov || 0);
+  const row = (label, value, color) => (
+    <div className="flex items-center justify-between gap-4">
+      <span className="flex items-center gap-1.5 text-slate-500">{color && <span className="w-2 h-2 rounded-sm" style={{ background: color }} />}{label}</span>
+      <span className="font-semibold text-slate-800 tabular-nums">{value}</span>
+    </div>
+  );
+  return (
+    <div className="bg-white rounded-lg border border-slate-200 shadow-md px-3 py-2 text-xs space-y-1 min-w-[190px]">
+      <div className="flex items-center justify-between gap-3 mb-1">
+        <span className="font-semibold text-slate-900">{format(new Date(`${d.period}T00:00:00`), 'MMMM yyyy')}</span>
+        <span className={`text-[10px] font-semibold uppercase tracking-wide ${d.isForecast ? 'text-indigo-600' : 'text-slate-400'}`}>{d.isForecast ? 'Forecast' : 'Actual'}</span>
+      </div>
+      {actual !== null && (
+        <>
+          {row('In coverage', formatNumber(d.inCov, 0), '#0284c7')}
+          {row('Out of coverage', formatNumber(d.outCov, 0), '#cbd5e1')}
+        </>
+      )}
+      {row('Expected', formatNumber(d.calibrated, 1), '#6366f1')}
+      {row('95% range', `${formatNumber(d.band[0], 0)} – ${formatNumber(d.band[1], 0)}`)}
+      {actual !== null && d.calibrated ? (
+        <div className="pt-1 mt-1 border-t border-slate-100">
+          {row('In coverage vs expected', `${d.inCov >= d.calibrated ? '+' : ''}${formatNumber(((d.inCov - d.calibrated) / d.calibrated) * 100, 0)}%`)}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -334,50 +388,6 @@ function CalibrationTable({ rows, factor, horizon, onSelect }) {
           })}
         </tbody>
       </table>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-function ModelPerformance({ d }) {
-  const bands = (d.bands || []).map((b) => ({ ...b, rate: num(b.hit_rate) }));
-  const deciles = (d.deciles || []).map((x) => ({ ...x, label: `D${x.decile}`, predicted: num(x.avg_probability), observed: num(x.observed_rate) }));
-  return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-3 gap-2 text-center">
-        <div className="bg-slate-50 rounded-lg p-2"><p className="text-[11px] text-slate-500">Recall</p><p className="text-lg font-bold">{formatPct(d.recall, 0)}</p><p className="text-[10px] text-slate-400">{d.flagged_replacements} of {d.replacements} flagged</p></div>
-        <div className="bg-slate-50 rounded-lg p-2"><p className="text-[11px] text-slate-500">Median lead</p><p className="text-lg font-bold">{d.median_lead_days ?? '—'} d</p><p className="text-[10px] text-slate-400">flag → replacement</p></div>
-        <div className="bg-slate-50 rounded-lg p-2"><p className="text-[11px] text-slate-500">Lead time</p>
-          <p className="text-[11px] text-slate-700 mt-1">{(d.lead_histogram || []).map((h) => `${h.bucket} d: ${h.count}`).join(' · ') || '—'}</p></div>
-      </div>
-      <table className="w-full text-xs">
-        <tbody>
-          {bands.map((b) => (
-            <tr key={b.band}>
-              <td className="py-1 w-20 text-slate-700 font-medium">{b.band}</td>
-              <td className="py-1">
-                <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-sky-600" style={{ width: `${(b.rate || 0) * 100}%` }} />
-                </div>
-              </td>
-              <td className="py-1 pl-2 w-32 text-right tabular-nums text-slate-600">{formatPct(b.rate, 1)} · {b.hits}/{formatNumber(b.predictions)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <div className="h-36">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={deciles} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
-            <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#64748b' }} tickLine={false} axisLine={false} />
-            <YAxis tickFormatter={(v) => formatPct(v, 0)} tick={{ fontSize: 10, fill: '#64748b' }} tickLine={false} axisLine={false} />
-            <Tooltip {...tooltipStyle} formatter={(v, n) => [formatPct(v, 2), n]} />
-            <Legend wrapperStyle={{ fontSize: 10 }} />
-            <Bar dataKey="predicted" name="Predicted probability" fill="#cbd5e1" />
-            <Bar dataKey="observed" name="Observed rate" fill="#0284c7" />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-      <p className="text-[11px] text-slate-400">Calibration by probability decile: matching bars mean the probabilities can be taken at face value.</p>
     </div>
   );
 }

@@ -46,7 +46,6 @@ export async function fetchModelOptions() {
   return data || [];
 }
 export const fetchForecast = (f, horizon) => rpc('wty_rel_forecast', { p_filters: f, p_horizon_months: horizon });
-export const fetchModelPerformance = (f, days = 30) => rpc('wty_rel_model_performance', { p_filters: f, p_horizon_days: days });
 export const fetchAtRiskPage = (f, { minBand = 'Medium', beforeExpiryOnly = false, limit = 25, offset = 0 } = {}) =>
   rpc('wty_rel_at_risk_page', { p_filters: f, p_min_band: minBand, p_before_expiry_only: beforeExpiryOnly, p_limit: limit, p_offset: offset });
 export const fetchPrecursors = (partId) => rpc('wty_rel_precursors', { p_part_id: partId });

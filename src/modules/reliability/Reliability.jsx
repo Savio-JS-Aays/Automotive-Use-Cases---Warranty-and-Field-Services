@@ -14,11 +14,13 @@ import SignalDrawer from './components/SignalDrawer';
 
 // Design: docs/modules/reliability-early-warning/design.md (merges the old EWS and Predictive Calibration pages)
 
-const TABS = [
-  { key: 'signals', label: 'Signals', Component: SignalsTab },
+// Signals is hidden for now; set hidden: false to bring it back
+const ALL_TABS = [
+  { key: 'signals', label: 'Signals', Component: SignalsTab, hidden: true },
   { key: 'reliability', label: 'Reliability', Component: ReliabilityTab },
   { key: 'forecast', label: 'Forecast & Coverage', Component: ForecastTab },
 ];
+const TABS = ALL_TABS.filter((t) => !t.hidden);
 
 export default function Reliability() {
   const global = useFilterStore();
@@ -54,7 +56,9 @@ export default function Reliability() {
   };
 
   const partId = chips.part_id?.[0]?.value || null;
-  const ActiveTab = (TABS.find((t) => t.key === tab) || TABS[0]).Component;
+  // A hidden or unknown tab (e.g. an old ?rel= link to Signals) falls back to the first visible one
+  const active = TABS.find((t) => t.key === tab) || TABS[0];
+  const ActiveTab = active.Component;
 
   return (
     <div className="space-y-4">
@@ -65,7 +69,7 @@ export default function Reliability() {
         {TABS.map((t) => (
           <button key={t.key} type="button" onClick={() => local.setTab(t.key)}
             className={`px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 -mb-px transition-colors ${
-              tab === t.key ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-800'
+              active.key === t.key ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}>
             {t.label}
           </button>

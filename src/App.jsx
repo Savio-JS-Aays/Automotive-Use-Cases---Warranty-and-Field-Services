@@ -20,7 +20,7 @@ function App() {
           <Route path="/claims-analytics" element={<ClaimsAnalytics />} />
           <Route path="/reliability" element={<Reliability />} />
           {/* EWS and Predictive Calibration were merged into Reliability & Early Warning */}
-          <Route path="/ews" element={<Navigate to={`/reliability?rel=${encodeURIComponent('{"tab":"signals"}')}`} replace />} />
+          <Route path="/ews" element={<Navigate to={`/reliability?rel=${encodeURIComponent('{"tab":"reliability"}')}`} replace />} />
           <Route path="/predictive-calibration" element={<Navigate to={`/reliability?rel=${encodeURIComponent('{"tab":"reliability"}')}`} replace />} />
           
           <Route path="/accountability" element={<Accountability />} />

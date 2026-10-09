@@ -4,7 +4,7 @@ import { create } from 'zustand';
 // chips: { <filter key from the p_filters contract>: [{ value, label }] }
 
 const INITIAL = {
-  tab: 'signals',
+  tab: 'reliability',
   regionBasis: 'vehicle',
   chips: {},
   groupBy: 'variant',
